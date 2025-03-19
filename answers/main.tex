@@ -1,0 +1,493 @@
+\documentclass{article}
+
+\usepackage{amssymb}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{bbm}
+
+\newtheorem{theorem}{Theorem}
+
+\newcommand{\Scode}[1]{{\fontfamily{cmss}\selectfont\color{Mahogany}#1}}
+\newcommand{\Gcode}[1]{{\color{OliveGreen}\textit{#1}}}
+\newcommand{\Ccode}[1]{{\color{BlueViolet}\textbf{#1}}}
+\newcommand{\GCICN}[0]{GCIC\(^\mathcal{N}\)}
+\newcommand{\GCICG}[0]{GCIC\(^\mathcal{G}\)}
+\newcommand{\GCICS}[0]{GCIC\(^\uparrow\)}
+\newcommand{\CCICN}[0]{CastCIC\(^\mathcal{N}\)}
+\newcommand{\CCICG}[0]{CastCIC\(^\mathcal{G}\)}
+\newcommand{\CCICS}[0]{CastCIC\(^\uparrow\)}
+\newcommand{\GGEq}[0]{\(\triangleright\)GEq}
+
+\title{Qualifying Exam: On the Feasibility of a Gradual Dependently Typed
+  Language for Programming}
+
+\author{Darshal Shetty}
+
+\date{}
+
+\begin{document}
+
+\maketitle
+
+This document has three sections. Each section answers the questions asked in
+this qualifying examination. The first subsection of every section restates the
+question which it answers.
+
+\section{Literature Review}%
+\label{sec:question1}
+
+\subsection{The Question}
+What are the main scientific results and problems that have been solved already
+in the literature on gradual typing with dependent types? Identify the points in
+the design space that have been explored and what properties they have. Are
+there any tensions or tradeoffs that prevent the designs from having all the
+desirable properties? In your literature search, make sure to include at least
+the following papers:
+
+\begin{enumerate}
+  \item Approximate Normalization for Gradual Dependent Types, ICFP
+    2019.\cite{eremondi_approximate_2019}
+  \item On The Design of a Gradual Dependently Typed Language for Programming,
+    PhD Thesis 2023.\cite{eremondi_design_2023}
+  \item Gradualizing the Calculus of Inductive Constructions, TOPLAS
+    2022.\cite{lennon-bertrand_gradualizing_2022}
+  \item A reasonably gradual type theory, ICFP
+    2022.\cite{maillard_reasonably_2022}
+  \item Propositional equality for gradual dependently typed programming, ICFP
+    2022.\cite{eremondi_propositional_2022}
+  \item Partial Gradual Dependent Type Theory, SPLASH
+    2023.\cite{shi_partial_2023}
+  \item Gradual Indexed Inductive Types, ICFP 2024.\cite{malewski_gradual_2024}
+\end{enumerate}
+
+\subsection{Introduction}
+
+Siek and Taha\cite{siek_gradual_2006} introduced the notion of gradual typing
+which allows mixing of static and dynamic typing using a principled approach.
+They introduced a new type \verb|?| which is inhabited by any term similar to
+the \verb|Any| type in dynamically-typed or uni-typed languages. Unlike
+dynamically-typed languages, the programmer has control over which portions of
+the program gets checked at run-time and which ones get checked at compile-time
+by mixing \verb|?| into the type syntax. In order to make sure that type
+constraints for sub-terms annotated with fully static types (i.e., types without
+\verb|?| in them) occurring within terms of type \verb|?| hold true, the source
+language gets elaborated into a language with casts. The casts ensure that the
+necessary checks are performed on values moving across the static-dynamic
+boundary at run time.
+
+Siek et al.\cite{siek_refined_2015} noticed that the description of gradual
+types in \cite{siek_gradual_2006} was not formalized rigorously which later
+resulted in the creation of gradually typed systems which contain some
+undesirable properties. Thus, they came up with the precision relation
+\(\sqsubseteq\) which related types that were syntactically similar, except that
+some sub-terms in one type were replaced by \verb|?|. We say that a type
+\verb|T|\(_1\) is more precise than another type \verb|T|\(_2\), i.e.
+\verb|T|\(_1 \sqsubseteq\) \verb|T|\(_2\), when \verb|T|\(_2\) has more \verb|?|
+in its syntax than \verb|T|\(_1\). For example, we can compare the precision of
+two function types as \verb|T -> (T -> T)| \(\sqsubseteq\) \verb|T -> ?| where
+\verb|T| could be any type. The definition of precision on types is extended to
+terms to say that \verb|t|\(_1 \sqsubseteq\) \verb|t|\(_2\) for terms
+\verb|t|\(_1\), \verb|t|\(_2\) iff they differ only in type annotations and for
+each type annotation \verb|T|\(_1\) in \verb|t|\(_1\), \verb|T|\(_1
+\sqsubseteq\) \verb|T|\(_2\), where \verb|T|\(_2\) is the corresponding type in
+\verb|t|\(_2\) . Using this precision relation, Siek et al. define the static
+and dynamic \textit{gradual guarantees}.
+
+We will now state the gradual guarantees using the precision relation
+\(\sqsubseteq\) and the judgment \verb|e|\(:\)\verb|T| which states that a
+closed term \verb|e| has type \verb|T|. The judgment
+\verb|e|\(\Downarrow\)\verb|v| expresses that a term \verb|e| evaluates to a
+value \verb|v| and \verb|e|\(\Uparrow\) means that \verb|e| diverges during
+evaluation.
+
+\textbf{Gradual guarantees: } Suppose \verb|e|\(\sqsubseteq\)\verb|e'| and
+\verb|e|\(:\)\verb|T|.
+  \begin{itemize}
+  \item \verb|e'|\(:\)\verb|T'| and
+    \verb|T|\(\sqsubseteq\)\verb|T'| for some \verb|T'|.
+  \item If \verb|e|\(\Downarrow\)\verb|v|, then \verb|e'|\(\Downarrow\)\verb|v'|
+    and \verb|v|\(\sqsubseteq\)\verb|v'|. If \verb|e|\(\Uparrow\) then
+    \verb|e'|\(\Uparrow\).
+  \item If \verb|e'|\(\Downarrow\)\verb|v'|, then \verb|e|\(\Downarrow\)\verb|v|
+    where \verb|v|\(\sqsubseteq\)\verb|v'|, or evaluating \verb|e| causes a
+    dynamic type error. If \verb|e'|\(\Uparrow\) then \verb|e|\(\Uparrow\), or
+    evaluating \verb|e| causes a dynamic type error.
+  \end{itemize}
+ The first guarantee is the \textit{static gradual guarantee} (SGG), while the
+ other two guarantees are the \textit{dynamic gradual guarantees} (DGG). These
+ gradual guarantees essentially state that typing and evaluation should be
+ \textit{monotone with respect to the precision relation}. This means that
+ losing precision should not lead to static or dynamic errors.
+
+Siek and Taha \cite{siek_gradual_2006} gradualize the simply typed lambda
+calculus (STLC) by adding \verb|?| to the type syntax. Later works show how we
+can gradualize other statically-typed systems such as ownership
+types\cite{sergey_gradual_2012}, refinement types\cite{lehmann_gradual_2017},
+security
+types\cite{fennell_gradual_2013}\cite{toro_type-driven_2018}\cite{chen_quest_2024}
+and session types\cite{igarashi_gradual_2017}. Here, we will discuss the
+gradualization of full-spectrum dependent types based on type theories like
+Martin-L\"of’s dependent type theory\cite{martin-lof_intuitionistic_1984} and
+calculus of constructions\cite{coquand_calculus_1988}.
+
+By the propositions as types interpretation of dependent types, gradualization
+allows us to partially state propositions by sprinkling \verb|?| in the type.
+Gradualization of dependent types also allow the run-time casts to check for
+more expressive type constraints corresponding to the rich types provided in
+this system. This should make programming using dependent types more accessible
+since programmers can have a running program even when the correctness of
+programs is partially specified and verified.
+
+This literature review will go over the systems described in the list of papers
+mentioned in the question above. We will discuss the following gradual dependent
+type systems:
+\begin{enumerate}
+  \item GDTL (\underline{G}radual \underline{D}ependently-\underline{T}yped
+    \underline{L}anguage) \cite{eremondi_approximate_2019}\cite{eremondi_design_2023}
+  \item GCIC (\underline{G}radual \underline{C}alculus of \underline{I}nductive
+    \underline{C}onstruction) and its variants \GCICG{}, \GCICS{} (read
+    ``GCIC-shift'') and \GCICN{}\cite{lennon-bertrand_gradualizing_2022}
+  \item GRIP\cite{maillard_reasonably_2022}
+  \item GEq (read
+    ``geek'')\cite{eremondi_propositional_2022}\cite{eremondi_design_2023}
+  \item \GGEq{}\cite{eremondi_design_2023} (assumed to be read
+    ``guarded geek'')
+  \item PUNK\cite{malewski_gradual_2024}
+  \item PGTT (\underline{P}artial \underline{G}radual Dependent \underline{T}ype
+    \underline{T}heory)\cite{shi_partial_2023}
+\end{enumerate}
+
+In this document we will constantly be referring to a static dependently-typed
+language which gets gradualized by adding \verb|?| to the static language to get
+a gradual surface language. We will also be referring to an intermediate
+language like the cast calculus which the gradual surface language elaborates
+into. Following the typographic conventions of Eremondi in
+\cite{eremondi_design_2023}, we will typeset static dependently-typed terms in
+\Scode{red san-serif font}, gradual surface terms in \Gcode{green italic serif
+  font} and elaborated intermediate terms in \Ccode{blue bold serif font}.
+
+GDTL is the first system which gradualizes full-spectrum dependent types by
+adding the \Gcode{?} type in its type
+system.\cite{eremondi_approximate_2019}\cite{lennon-bertrand_gradualizing_2022}
+A natural consequence of adding the \Gcode{?} type to a dependently-typed system
+and the fact that dependent types are dependent on terms is that such a system
+will also require us to add \Gcode{?} as a term. An example of why one would
+need the \Gcode{?} term can be seen in the type of length-indexed lists, i.e.,
+vectors. In a statically typed system, type of vectors of length \Scode{n}
+containing elements of type \Scode{A} is \Scode{Vec A n}. A gradual dependent
+type system allows us to express a vector whose size is unknown with the type
+\Gcode{Vec A ?}. The second argument to \Gcode{Vec} should be a term with
+natural number type which implies that \Gcode{?} in \Gcode{Vec A ?} has the
+natural number type. Thus, even though \Gcode{?} occurs in a type it is actually
+a term. GDTL and the other systems discussed in this literature review all have
+\Gcode{?} as a term in some form.
+
+Dependently-typed systems evaluate terms during type-checking. The evaluation is
+thus expected to terminate without producing dynamic type errors in order to let
+the type-checking procedure terminate. Adding \Gcode{?}, however, introduces the
+side effects of divergence and cast errors during the type-checking phase which
+is in tension with dependent type-checking. GDTL solves this issue by using an
+evaluation procedure called approximate normalization which we will discuss
+later.
+
+While GDTL doesn't account for inductive types, GCIC addresses this by
+gradualizing the calculus of inductive
+constructions(CIC)\cite{coquand_calculus_1988}. GCIC addresses the divergence of
+type-checking issue by presenting the Fire Triangle of Graduality theorem. It
+states that in order to avoid divergence (i.e. achieve \textit{strong
+  normalization}), a gradual dependently typed system needs to give up on some
+other important properties, namely \textit{graduality} and
+\textit{conservativity}. New and Ahmed\cite{new_graduality_2018} introduce
+graduality as a semantic reformulation of the gradual guarantees. Meanwhile,
+conservativity of a gradual type system with respect to a static type system
+states that all terms in the gradual system in which \Gcode{?} doesn't occur
+should coincide with terms in the static system. Each variant of GCIC presented
+in \cite{lennon-bertrand_gradualizing_2022} gives up on one property mentioned
+in the Fire Triangle theorem. The variant which gives up strong normalization
+(\(\mathcal{N}\)) is \GCICG{}, the \GCICN{} variant gives up graduality
+(\(\mathcal{G}\)) and the \GCICS{} variant gives up conservativity with respect to
+CIC (\(\mathcal{C}\)\textsubscript{/CIC}). The cast calculus which GCIC
+elaborates to is called CastCIC. The cast calculi for \GCICG{}, \GCICN{} and \GCICS{}
+variants are \CCICG, \CCICN and \CCICS, respectively.
+
+Maillard et al.\cite{maillard_reasonably_2022} claim that \GCICN{} is the most
+appealing system based on GCIC in the context of proof assistants. This is
+because \GCICN{} ensures decidability of type-checking, (weak) canonicity, and
+ensures that it supports existing CIC developments and libraries due to it being
+conservative with respect to CIC. Even though \GCICN{} doesn't satisfy
+graduality globally, Maillard et al. propose a novel method to prove the
+graduality of a fragment of terms in \GCICN{} within \GCICN{} itself. They
+present a modified version of \GCICN{} called GRIP which adopts a two-layer
+structure: an impure hierarchy of types for gradual terms, and a pure sort of
+propositions that can refer to gradual terms and errors, but whose inhabitants
+cannot use errors or unknown terms. It is in this pure propositional sort that
+they define precision as a type similar to how propositional equality types
+internalize the equality relation in static dependent types.
+
+Even though GCIC provides gradual inductive types, it doesn't provide gradual
+indexed inductive types which are essential to define the propositional equality
+type. Eremondi et al. present GEq\cite{eremondi_propositional_2022} which adds
+gradual propositional equality to \GCICG{} while preserving its properties.
+Unlike GRIP which was designed to be used as a proof assistant, GEq's authors
+designed it to be used as programming language with dependent types. \GCICG{}
+was chosen as a base to develop GEq because the non-termination of type-checking
+in \GCICG{} is not as detrimental for programming languages as compared to proof
+assistants. Moreover, the graduality and conservativity with respect to CIC
+properties of \GCICG{} are important for programming languages. Graduality
+allows for ease of evolution of program from being dynamically typed to
+statically typed, and conservativity allows the programmer to use the full
+capabilities of CIC once all type annotations are static.
+
+Later in his thesis\cite{eremondi_design_2023}, Eremondi introduces \GGEq{}
+which modifies GEq in order to get back decidable type-checking. \GGEq{} uses
+approximate normalization from GDTL achieve decidable type-checking. The
+decidability result is proven by building a syntactic model of \GGEq{} in a
+variant of Guarded Type Theory (GTT). Eremondi conjectures that \GGEq{}
+preserves the gradual guarantees and conservativity properties of GEq. He claims
+that \GGEq{} avoids the Fire Triangle of Graduality theorem because it doesn't
+restrict terms in the ways that GCIC variants do in order to fulfill the gradual
+guarantees or conservatively extending CIC.
+
+GDTL, GCIC and GEq lack indexed inductive types, but they have a way to use a
+restricted version of it. PUNK, however, is the first system to fully support
+gradual indexed inductive types\cite{malewski_gradual_2024}. PUNK extends GRIP
+by adding indexed inductive types to it. While presenting PUNK, Malewski et al.
+highlight that there is no unique or generally better way to deal with casts on
+type indices at runtime: there are just different possible semantics for cast
+reduction, with different tradeoffs, just like there are different possible
+semantics for higher-order casts in standard gradually-typed
+languages\cite{siek_exploring_2009}. PUNK has 3 different semantics for reducing
+multiple consecutive casts, namely free, meet and forgetful. As multiple casts
+are applied during reduction to a constructor, PUNK accumulates the indices in
+the casts' types into an index accumulator. An index accumulator \Ccode{acc} is
+equipped with a term representing the empty accumulator \Ccode{\(\mathbbm{1}\)}
+and an operation \(i \otimes\)\Ccode{\(acc\)} to extend an accumulator
+\Ccode{\(acc\)} with an index \(i\). Malewski et al. parameterize PUNK
+semantics based on how index accumulator operations are defined in order to get
+the 3 different kinds of cast reduction semantics.
+
+PGTT adopts an approach which is different than the other systems mentioned
+here. Instead of allowing programs to range from dynamically typed to static
+dependently typed, PGTT allows programs to range from static non-dependently
+typed to static dependently typed. This means that PGTT restricts entirely
+unknown types and only permits dynamic terms on the type indices,. For example,
+the type \Gcode{Vec n ?} is valid in PGTT, but \Gcode{?} as a type is invalid.
+PGTT's restriction on entirely unknown types simplifies runtime type checks,
+allows embedding into a static, dependently typed language, and reduces the
+performance overhead induced by gradual typing.
+
+Now that we've had a bird's eye view of gradual full-spectrum dependently-typed
+systems in the current literature, section \ref{subsec:design_properties} delves
+deeper into some key design decisions made in these systems and what kind of
+properties do these decisions influence. Section
+\ref{subsec:tradeoffs_drawbacks} discusses the tradeoffs that come with the
+design decisions and drawbacks of the systems. Finally, section
+\ref{subsec:future} mentions the work that we still need to do in this area of
+research and improvements which we can make to current gradual full-spectrum
+dependently-typed systems.
+
+\subsection{Design Decisions and Their Properties}\label{subsec:design_properties}
+
+In this section we will discuss the design of gradual dependently-typed systems
+discussed in the previous section along with which properties they satisfy.
+
+\subsubsection{GDTL}
+
+Eremondi, Tanter and Garcia\cite{eremondi_approximate_2019} derive GDTL from a
+call-by-value static dependently-typed system called SDTL (a \underline{S}tatic
+\underline{D}ependently \underline{T}yped \underline{L}anguage). SDTL syntax of
+terms (metavariable \Scode{t} represents terms and \Scode{T} represents terms
+that are types) contains lambda abstraction (\Scode{\(\lambda\)x.t}),
+application (\Scode{t\(_1\) t\(_2\)}), dependent function type (\Scode{(x :
+  T\(_1\)) \(\to\) T\(_2\)}), type universes (\Scode{Type\(_\ell\)} is a
+universe at level \(\ell\)) and type ascription (\Scode{t::T}). SDTL is
+bidirectionally type-checked and the type-checking rules ensure that two types
+are the same by comparing their \(\beta\)-reduced, \(\eta\)-long normal forms.
+The authors of GDTL then apply the AGT (Abstracting Gradual Typing)
+methodology\cite{garcia_abstracting_2016} to SDTL to systematically add
+\Gcode{?} to the static language. AGT alone is not enough to incorporate the
+side-effects of divergence and type-mismatch errors, so the authors of GDTL
+decided to use a separate notion of normalization during type-checking called
+approximate normalization which terminates without raising errors, but gives
+imprecise results. Approximate normalization is a major contribution of GDTL and
+we will expand on it soon.
+
+GDTL, being the first system to introduce gradual typing into a
+dependently-typed system, addresses the major conflicts between the two typing
+disciplines: divergence and error propagation during type-checking. In static
+dependently-typed systems, usually the type-checker compares types to see if
+they are equal. For example, when we apply a dependent function to an argument,
+the domain type of the function and the type of the argument should be equal.
+Two types are equal when they reduce to the same normal form. By adding
+\Gcode{?} as both a type and a term, we can embed diverging terms from the
+Untyped Lambda Calculus which will lead to non-termination during type-checking.
+
+\begin{itemize}
+  \item Describe adding Vec and Nat to GDTL in order to provide better examples.
+  \item Example of a non-terminating type-checking program (Vector whose size diverges)
+  \item Describe how GDTL can have type errors during normalization, even though
+    the term being normalized is well-typed.
+  \item Example of a program which causes a dynamic type error while normalizing
+    during type-checking.
+  \item Mention false gradual guarantee claim in
+    \cite{eremondi_approximate_2019} which is why we will refer to Joey's thesis
+    \cite{eremondi_design_2023} for discussing design of GDTL.
+  \item Describe approximate normalization by mentioning peculiarities of normal
+    form syntax, where is it used in the type-checking rules.
+  \item Describe how approximate normalization handles non-termination.
+  \item Describe how thesis version of approximate normalization handles dynamic
+    type errors.
+  \item Discuss the type preservation and termination properties of approximate
+    normalization.
+  \item Describe the run-time semantics of GDTL
+    \begin{itemize}
+    \item syntax uses evidence instead of ascriptions
+    \item separate term for run-time errors
+    \item values syntax prevents multiple evidence terms to be stacked on an actual value
+    \item describe initial evidence and meet operation
+    \item Semantics designed based on satisfying a hypothetical progress
+      \& preservation property for the run-time language.
+    \item Summarize section 3.6.3 in the thesis
+    \end{itemize}
+  \item Give an example of term being evaluated by the run-time rules.
+  \item Discuss properties of GDTL
+    \begin{itemize}
+      \item type safety
+      \item conservative extension of SDTL
+      \item embedding the untyped lambda calculus
+      \item gradual guarantees
+    \end{itemize}
+\end{itemize}
+
+\subsubsection{GCIC}
+\begin{itemize}
+  \item Lennon-Bertrand, Maillard and
+    Tabareau\cite{lennon-bertrand_gradualizing_2022} design GCIC by gradualizing
+    CIC\cite{coquand_calculus_1988} and explore various metatheoretic challenges
+    associated with this endeavor.
+  \item GCIC uses ideas from exceptional type theory
+    (ExTT)\cite{pedrot_failure_2018}, embedding-projection
+    pairs\cite{new_graduality_2018} and
+    GDTL\cite{eremondi_approximate_2019}\cite{eremondi_design_2023} to extend
+    CIC with the \verb|?| type.
+  \item Lennon-Bertrand et al.\cite{lennon-bertrand_gradualizing_2022} emphasize
+    how the (strong) \textit{Normalization} (\(\mathcal{N}\)) (similar to
+    termination in GDTL) and (type) \textit{Safety} (\(\mathcal{S}\))
+    (antithetical to cast errors in GDTL) properties of CIC get endangered when
+    gradualizing it.
+  \item Other desirable properties which GCIC should have are conservativity w.r.t.
+    CIC (\(\mathcal{C}\)\textsubscript{/CIC}) and gradual guarantees.
+  \item Graduality
+    \begin{itemize}
+      \item Describe how GCIC defines DGG as satisfying observational error
+        approximation (Definitions 2 \& 3
+        \cite{lennon-bertrand_gradualizing_2022})
+      \item GCIC aims to satisfy \textit{Graduality} (\(\mathcal{G}\)) which
+        subsumes DGG.
+      \item Lennon-Bertrand et al. use the term \textit{Graduality}
+        (\(\mathcal{G}\)) for the DGG established with respect to a notion of
+        precision that also induces \textit{embedding-projection pairs} (ep-pairs).
+      \item New and Ahmed\cite{new_graduality_2018} introduce ep-pairs in order to
+        provide a more sematic formulation and proof of graduality.
+      \item Lennon-Bertrand et al. state that, according to Max and New, the casts
+        between two types related by precision form an ep-pair if and only if the
+        casts form an adjunction which induces a retraction. This means that
+        casting a term into a less precise type and back should give back the same
+        term. For example, \Gcode{1::?::\(\mathbb{N}\)} should be equivalent to
+        \Gcode{1}. Here, \Gcode{::} is the type ascription operator which gets
+        converted to casts in the cast calculus.
+      \item Lennon-Bertrand et al. claim that this alternate version of DGG ensures
+        that type-checking mechanisms in the dynamic semantics such as casts only
+        perform checking of types and do not alter the run-time behavior.
+    \end{itemize}
+  \item BCIC
+  \item fire triangle theorem
+  \item Describe use cases of the three GCIC variants
+  \item Describe how the three variants get parameterized so that the same set
+    of inference rules get reused
+  \item Syntax of surface language
+  \item Syntax of cast language
+  \item Elaboration and its properties
+    \begin{itemize}
+      \item Usually elaboration judgment uses types from the source language,
+        but here types are used from the target language i.e. cast calculus
+      \item The CastCIC types used in the elaboration however are in one-to-one correspondence with GCIC types.
+      \item Therefore, the \(\alpha\)-consistency relation which is used in the
+        elaboration judgment ignores casts so that \(\alpha\)-consistency on
+        CastCIC terms corresponds to \(\alpha\)-equality on GCIC terms which
+        don't have casts.
+    \end{itemize}
+  \item Demonstrate how the diverging term \Ccode{\(\Omega\)} reduces in all variants
+  \item Precision is a simulation for reduction
+  \item Properties of GCIC and models built to prove them
+\end{itemize}
+
+\subsubsection{GRIP}
+\subsubsection{GEq}
+\subsubsection{\GGEq{}}
+\subsubsection{PUNK}
+\subsubsection{PGTT}
+
+\subsection{Tradeoffs and Drawbacks}\label{subsec:tradeoffs_drawbacks}
+\subsubsection{GDTL}
+\begin{enumerate}
+  \item Hereditary substitution doesn't scale well for gradual typing because of
+    the explosion of rules which get added in order to preserve termination
+    whenever we add a new feature to the system.
+  \item AGT was used in hopes of deriving a systematic way to derive a gradual
+    dependently-typed language. Though it succeeds in helping us derive
+    metafunctions, it doesn't seem to give us a straightforward way to derive
+    approximate normalization which is a key feature.
+  \item Approximate normalization results in a \Gcode{?} either if the
+    type-checker decides that a function application diverges or if there's a
+    type mismatch. Thus, when the normalization process gives us a \Gcode{?}, it
+    becomes difficult to identify why normalization failed.
+  \item GDTL doesn't support features that a practical dependently typed
+    programming language needs.
+\end{enumerate}
+\subsubsection{GCIC}
+\begin{itemize}
+  \item Writing down universe levels is tedious. Lennon-Bertrand et al.
+    recommend typical ambiguity \cite{harper_type_1991} as the solution.
+\end{itemize}
+
+\subsubsection{GRIP}
+\subsubsection{GEq}
+\subsubsection{\GGEq{}}
+\subsubsection{PUNK}
+\subsubsection{PGTT}
+
+\subsection{Future Work}\label{subsec:future}
+
+\section{Implementing GCIC}
+
+\subsection{The Question}
+Implement a type checker that matches as closely as you can one of the language
+designs in the literature from Question 1. Test the type checker on all the
+examples from the above papers that can be reasonably adapted. In what ways does
+the type checker differ from the type system of the chosen language design? Is
+there anything that makes the combination of gradual typing and dependent types
+difficult to handle in the implementation of a type checker? Are there any
+results in the literature that can help overcome those difficulties?
+
+\subsection{Notes}
+\begin{itemize}
+  \item Locally nameless representation \cite{chargueraud_locally_2012}
+  \item Refocusing in reduction semantics \cite{danvy_refocusing_2004}
+  \item Inductive eliminators are not guarded (Eduardo Giménez. 1998. Structural
+    recursive definitions in type theory)
+  \item No well-formedness checks on inductive type definitions
+\end{itemize}
+
+\section{Dogfooding our implementation}
+
+\subsection{The Question}
+Critique the current state of the art with respect to the practical concern of
+developing code and proofs about that code. Using the type checker that you
+developed in question 2, apply it as best you can to developing the code and
+correctness proof for a textbook data-structure of your choice (but more complex
+than a linked-list or vector). Reflect on what went well versus what problems
+were encountered.
+
+\bibliographystyle{acm} \bibliography{ref}
+
+\end{document}
