@@ -410,13 +410,15 @@ Untyped Lambda Calculus which will lead to non-termination during type-checking.
     \begin{itemize}
       \item Usually elaboration judgment uses types from the source language,
         but here types are used from the target language i.e. cast calculus
-      \item The CastCIC types used in the elaboration however are in one-to-one correspondence with GCIC types.
+      \item The CastCIC types used in the elaboration however are in one-to-one
+        correspondence with GCIC types.
       \item Therefore, the \(\alpha\)-consistency relation which is used in the
         elaboration judgment ignores casts so that \(\alpha\)-consistency on
         CastCIC terms corresponds to \(\alpha\)-equality on GCIC terms which
         don't have casts.
     \end{itemize}
-  \item Demonstrate how the diverging term \Ccode{\(\Omega\)} reduces in all variants
+  \item Demonstrate how the diverging term \Ccode{\(\Omega\)} reduces in all
+    variants
   \item Precision is a simulation for reduction
   \item Properties of GCIC and models built to prove them
 \end{itemize}
@@ -473,9 +475,14 @@ results in the literature that can help overcome those difficulties?
 \begin{itemize}
   \item Locally nameless representation \cite{chargueraud_locally_2012}
   \item Refocusing in reduction semantics \cite{danvy_refocusing_2004}
-  \item Inductive eliminators are not guarded (Eduardo Giménez. 1998. Structural
-    recursive definitions in type theory)
-  \item No well-formedness checks on inductive type definitions
+  \item Inductive eliminators are not guarded i.e. no termination checking is
+    done. (see Eduardo Giménez, 1998. Structural recursive definitions in type
+    theory)
+  \item No well-formedness (and, in particular, strict positivity) checks on inductive
+    type definitions (also see Eduardo Giménez, 1998)
+  \item \(\alpha\)-consistency rules don't specify how the universe levels in
+    constructor and inductive type instantiations are related. Right now we add
+    the check that the two levels should be the same.
 \end{itemize}
 
 \section{Dogfooding our implementation}

@@ -9,7 +9,7 @@
 
 (check-equal? (Program-term
                (parse prog-nat-one))
-              (Constr 'Nat 'succ '() (list (Constr 'Nat 'zero '() '()))))
+              (Constr 'Nat 'succ 0 '() (list (Constr 'Nat 'zero 0 '() '()))))
 
 (check-equal? (last (unparse (parse prog-nat-one))) (last prog-nat-one))
 
@@ -17,13 +17,13 @@
 
 (check-equal? (Program-term
                (parse prog-list-nat-one))
-              (Constr 'List 'cons
-                      (list (IndT 'Nat '()))
+              (Constr 'List 'cons 0
+                      (list (IndT 'Nat 0 '()))
                       (list
-                       (Constr 'Nat 'succ '()
-                               (list (Constr 'Nat 'zero '() '())))
-                       (Constr 'List 'null
-                               (list (IndT 'Nat '())) '()))))
+                       (Constr 'Nat 'succ 0 '()
+                               (list (Constr 'Nat 'zero 0 '() '())))
+                       (Constr 'List 'null 0
+                               (list (IndT 'Nat 0 '())) '()))))
 
 (check-equal? (last (unparse (parse prog-list-nat-one))) (last prog-list-nat-one))
 
@@ -50,9 +50,9 @@
                  (Var 'X)
                  (App (Var 'f) (Var 'x))))))
 
-(check-true (=α (subst (IndT 'Nat '()) 'X term-subst-test)
+(check-true (=α (subst (IndT 'Nat 0 '()) 'X term-subst-test)
                 (Lam 'f
-                     (Pi '_ (IndT 'Nat '()) (IndT 'Nat '()))
+                     (Pi '_ (IndT 'Nat 0 '()) (IndT 'Nat 0 '()))
                      (Lam 'X
                           (Univ 0)
                           (Lam 'x

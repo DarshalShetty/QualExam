@@ -2,67 +2,59 @@
 
 (provide (all-defined-out))
 
-(define variant (make-parameter #f))
 (define supported-variants '(gcic-n gcic-g gcic-shift))
 
-(define (set-variant variant^)
-  (cond
-    [(memv variant^ supported-variants) (variant variant^)]
-    [else (error 'set-variant
-                 "Variant '~a' not supported. Expected one of ~a"
-                 variant^ supported-variants)]))
-
 ;; Terms used in bidirectional CIC, GCIC surface language and CastCIC
-(define-struct Var (name) #:transparent)
-(define-struct Univ (level) #:transparent)
-(define-struct App (rator rand) #:transparent)
-(define-struct Lam (fparam type body) #:transparent)
-(define-struct Pi (fparam type body) #:transparent)
-(define-struct IndT (name params) #:transparent)
-(define-struct Constr (ind-name name params args) #:transparent)
-(define-struct IndElim (ind-name scrut pred-fparam pred-body rec-name branches)
+(struct Var (name) #:transparent)
+(struct Univ (level) #:transparent)
+(struct App (rator rand) #:transparent)
+(struct Lam (fparam type body) #:transparent)
+(struct Pi (fparam type body) #:transparent)
+(struct IndT (name level params) #:transparent)
+(struct Constr (ind-name name level params args) #:transparent)
+(struct IndElim (ind-name scrut pred-fparam pred-body rec-name branches)
   #:transparent)
-(define-struct branch (constr-name arg-names body))
+(struct branch (constr-name arg-names body))
 
 ;; Terms used only in GCIC surface language
-(define-struct UnkSurf (level) #:transparent)
+(struct UnkSurf (level) #:transparent)
 
 ;; Terms used only in CastCIC
-(define-struct Unk (type) #:transparent)
-(define-struct Err (type) #:transparent)
-(define-struct Cast (term source target) #:transparent)
+(struct Unk (type) #:transparent)
+(struct Err (type) #:transparent)
+(struct Cast (term source target) #:transparent)
 
-(define-struct ind-def (name level param-types constrs) #:transparent)
-(define-struct constr-def (name arg-types) #:transparent)
+(struct ind-def (name param-tele constrs) #:transparent)
+(struct constr-def (name arg-tele) #:transparent)
 
-(define-struct Program (variant-name defs term) #:transparent)
+(struct Program (variant-name defs term) #:transparent)
 
 (define (parse program)
   (match program
     [`((variant ,v) ,@defs ,term)
      (define defs^ (parse-defs defs))
-     (define term^ (parse-term term defs^ (seteqv)))
+     (define term^ (parse-term term defs^))
      (Program v defs^ term^)]
     [_ (error 'parse-prog "Invalid program syntax: ~a" program)]))
 
 (define (parse-defs defs)
   (for/fold ([res '()])
             ([def defs])
-    (match-define `(data ,name ,level ,@params ,constrs) def)
+    (match-define `(data ,name ,@params ,constrs) def)
     (when (dict-has-key? res name)
       (error 'parse-defs "Inductive type ~a has already been defined." name))
-    (dict-set res name (parse-def name level params constrs res))))
+    (dict-set res name (parse-def name params constrs res))))
 
-(define (parse-def name level params constrs prev-defs)
+(define (parse-def name params constrs prev-defs)
   (define params^ (parse-telescope params prev-defs))
-  (define tmp-ind-def (ind-def name level params^ #f))
+  (define tmp-ind-def (ind-def name params^ #f))
   (define scope
     (for/seteqv ([index.type params^])
       (car index.type)))
   (define constrs^ (parse-constr-defs constrs name
                                       (dict-set prev-defs name tmp-ind-def)
                                       scope))
-  (ind-def name level params^ constrs^))
+  (ind-def name params^ constrs^))
 
 ;; A Telescope is an association list whose keys are identifiers and values are
 ;; types which refer to previous keys
@@ -80,18 +72,18 @@
 (define (parse-constr-defs constrs ind-name prev-defs scope)
   (match constrs
     ['() (hasheqv)]
-    [`((,name . ,arg-types) . ,rest-constrs)
+    [`((,name . ,arg-tele) . ,rest-constrs)
      #:when (symbol? name)
      (define constructor-table (parse-constr-defs rest-constrs ind-name prev-defs scope))
      (when (dict-has-key? constructor-table name)
        (error 'parse-constr-defs "Constructor '~a' has already been defined in inductive type ~a" ind-name))
-     (dict-set constructor-table name (parse-constr-def name arg-types prev-defs scope))]
+     (dict-set constructor-table name (parse-constr-def name arg-tele prev-defs scope))]
     [_ (error 'parse-constr-defs "Invalid constructor definitions ~a" constrs)]))
 
-(define (parse-constr-def name arg-types prev-defs scope)
-  (constr-def name (parse-telescope arg-types prev-defs scope)))
+(define (parse-constr-def name arg-tele prev-defs scope)
+  (constr-def name (parse-telescope arg-tele prev-defs scope)))
 
-(define (parse-term term defs scope)
+(define (parse-term term defs [scope (seteqv)])
   (define (recurse t) (parse-term t defs scope))
   (match term
     ;; GCIC-only term
@@ -132,8 +124,12 @@
                 " is not defined as in the inductive"
                 " type definition for ~a.")
                constr-name ind-name)]
+       [(and (not (null? params)) (natural? (car params)))
+        ;; first param is actually the universe level
+        (Constr ind-name constr-name (car params) (map recurse (cdr params)) (map recurse args))]
        [else
-        (Constr ind-name constr-name (map recurse params) (map recurse args))])]
+        ;; set default universe level to 0
+        (Constr ind-name constr-name 0 (map recurse params) (map recurse args))])]
     [`(elim ,ind-name ,scrut as (λ (,z) ,P) rec ,f with . ,branches)
      #:when (and (symbol? z) (symbol? ind-name) (symbol? f))
      (unless (dict-has-key? defs ind-name)
@@ -150,8 +146,14 @@
               (parse-term P defs (set-add scope z)) f
               (parse-elim-branches branches ind-name defs (set-add scope f)))]
     [`(,ind-name . ,params)
-     #:when (dict-has-key? defs ind-name)
-     (IndT ind-name (map recurse params))]
+     #:when (and (dict-has-key? defs ind-name))
+     (cond
+       [(and (not (null? params)) (natural? (car params)))
+        ;; first param is actually the universe level
+        (IndT ind-name (car params) (map recurse (cdr params)))]
+       [else
+        ;; set default universe level to 0
+        (IndT ind-name 0 (map recurse params))])]
     [`(,rator ,rand)
      (App (recurse rator) (recurse rand))]
     [_
@@ -188,19 +190,19 @@
 
 (define (unparse-defs defs)
   (for/list ([def (dict-values defs)])
-    (match-define (ind-def name level param-types constrs)
+    (match-define (ind-def name param-types constrs)
       def)
     (define-values (param-types^ scope)
       (unparse-telescope param-types (seteqv)))
-    `(data ,name ,level ,param-types^ ,(unparse-constr-defs constrs scope))))
+    `(data ,name ,param-types^ ,(unparse-constr-defs constrs scope))))
 
 
 (define (unparse-constr-defs constrs scope)
   (for/list ([constr (dict-values constrs)])
-    (match-define (constr-def name arg-types) constr)
-    (define-values (arg-types^ _)
-      (unparse-telescope arg-types scope))
-    `(,name . ,arg-types^)))
+    (match-define (constr-def name arg-tele) constr)
+    (define-values (arg-tele^ _)
+      (unparse-telescope arg-tele scope))
+    `(,name . ,arg-tele^)))
 
 (define (unparse-telescope telescope scope)
   (for/fold ([result '()]
@@ -237,14 +239,20 @@
      `(λ (,x : ,(recurse T)) ,(unparse-term body (set-add scope x)))]
     [(Pi x T body)
      `(Π (,x : ,(recurse T)) ,(unparse-term body (set-add scope x)))]
-    [(Constr ind-name constr-name params args)
-     `(@ ,ind-name ,constr-name ,@(map recurse params) & ,@(map recurse args))]
+    [(Constr ind-name constr-name level params args)
+     (cond
+       [(zero? level) `(@ ,ind-name ,constr-name ,@(map recurse params) & ,@(map recurse args))]
+       [else `(@ ,ind-name ,constr-name ,level ,@(map recurse params) & ,@(map recurse args))])]
     [(IndElim ind-name scrut z P f branches)
      `(elim ,ind-name ,(recurse scrut)
             as (λ (,z) ,(unparse-term P (set-add scope z)))
             rec ,f with .
             ,(unparse-elim-branches branches (set-add scope f)))]
-    [(IndT name params) `(,name . ,(map recurse params))]
+    [(IndT name level params)
+     (cond
+       [(zero? level) `(,name . ,(map recurse params))]
+       [else `(,name ,level . ,(map recurse params))])
+     ]
     [(App rator rand) `(,(recurse rator) ,(recurse rand))]
     [_ (error 'unparse-term "Invalid term: ~a" term)]))
 
@@ -259,7 +267,7 @@
 
 (define debug? (make-parameter #f))
 
-;; Checks for valid syntax, free variables and globally unique variable binder names
+;; Checks for valid syntax & free variables. Mostly used in test cases.
 (define (gcic-program? program)
   (*cic-program? gcic-term? program))
 
@@ -296,7 +304,7 @@
                #:result result)
               ([d defs])
       (match-define `(,key-name . ,def) d)
-      (match-define (ind-def name level param-types constrs)
+      (match-define (ind-def name param-types constrs)
         def)
       (cond
         [(not (symbol? name))
@@ -304,12 +312,6 @@
                      (string-append  "Name of inductive type definition "
                                      "should be a symbol, but found: ~a")
                      name))
-         (return #f)]
-        [(not (natural? level))
-         (debug-log (format
-                     (string-append  "Level in definition of inductive type ~a"
-                                     " should be a natural number, but found: ~a")
-                     name level))
          (return #f)]
         [(not (eqv? key-name name))
          (debug-log (format
@@ -347,7 +349,7 @@
 (define (*cic-constr-defs? term? constrs prev-defs scope name)
   (for/and ([constr (dict-values constrs)]
             [key-name (dict-keys constrs)])
-    (match-define (constr-def name arg-types) constr)
+    (match-define (constr-def name arg-tele) constr)
     (cond
       [(not (symbol? name))
        (debug-log (format
@@ -362,7 +364,7 @@
                                   ", but is '~a' in the definition itself.")
                    key-name name))
        #f]
-      [(not (*cic-telescope? term? arg-types prev-defs scope))
+      [(not (*cic-telescope? term? arg-tele prev-defs scope))
        (debug-log (format (string-append
                            "Invalid argument declaration in the"
                            " definition of constructor: ~a")
@@ -476,8 +478,15 @@
                     term-name body))
         #f]
        [else #t])]
-    [(Constr ind-name constr-name params args)
+    [(Constr ind-name constr-name level params args)
      (cond
+       [(not (natural? level))
+        (debug-log (format
+                    (string-append  "Level in instantiation for constructor ~a of"
+                                    " inductive type ~a should be a natural"
+                                    " number, but found: ~a")
+                    constr-name ind-name level))
+        #f]
        [(not (dict-has-key? defs ind-name))
         (debug-log (format
                     (string-append
@@ -553,8 +562,15 @@
                            branches))
         #f]
        [else #t])]
-    [(IndT name params)
+    [(IndT name level params)
      (cond
+       [(not (natural? level))
+        (debug-log (format
+                    (string-append  "Level in instantiation for"
+                                    " inductive type ~a should be a natural"
+                                    " number, but found: ~a")
+                    name level))
+        #f]
        [(not (dict-has-key? defs name))
         (debug-log (format
                     (string-append
@@ -599,6 +615,15 @@
                    constr-name body))
        #f]
       [else #t])))
+
+;; preconditions: (and (*cic-defs? ccic-term? defs) (symbol? ind-name))
+;; postcondition: (and (list? (get-params defs ind-name level))
+;;                     (map ccic-term? (get-params defs ind-name level)))
+(define (get-params defs ind-name level)
+  ;; TODO: Figure out how to interpret level.
+  (define def (dict-ref defs ind-name))
+  (define params-tele (ind-def-param-tele def))
+  (map cdr params-tele))
 
 ;; Precondition: (and (ccic-term? t1) (ccic-term? t2))
 (define (=α t1 t2 [scope1 '()] [scope2 '()])
@@ -645,13 +670,13 @@
              (self T1 T2 scope1 scope2)
              (self body1 body2 (cons x1 scope1) (cons x2 scope2)))
      #t]
-    [`(,(IndT name params1) ,(IndT name params2))
+    [`(,(IndT name level params1) ,(IndT name level params2))
      #:when (for/and ([param1 params1]
                       [param2 params2])
               (self param1 param2 scope1 scope2))
      #t]
-    [`(,(Constr ind-name constr-name params1 args1)
-       ,(Constr ind-name constr-name params2 args2))
+    [`(,(Constr ind-name constr-name level params1 args1)
+       ,(Constr ind-name constr-name level params2 args2))
      #:when (and (for/and ([param1 params1]
                            [param2 params2])
                    (self param1 param2 scope1 scope2))
@@ -703,12 +728,12 @@
      (define-values (y^ body^)
        (subst-binder term for-symbol y body))
      (Pi y^ (recurse T) body^)]
-    [(Constr ind-name constr-name params args)
-     (Constr ind-name constr-name
-             (for/list ([param params])
-               (recurse param))
-             (for/list ([arg args])
-               (recurse arg)))]
+    [(Constr ind-name constr-name level params args)
+     (Constr ind-name constr-name level
+             (map recurse params)
+             (map recurse args))]
+    [(IndT name level params)
+     (IndT name level (map recurse params))]
     [(IndElim ind-name scrut z P f branches)
      (define-values (z^ P^)
        (subst-binder term for-symbol z P))
@@ -762,7 +787,7 @@
                     bind-name in-term)))]))
 
 (define (fresh-name name)
-  (gensym (string->symbol (string-append (symbol->string name) "§"))))
+  (gensym (string->symbol (string-append (symbol->string name) "_"))))
 
 (define (debug-log message)
   (when (debug?)

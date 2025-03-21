@@ -6,7 +6,7 @@
   '(variant gcic-n))
 
 (define ind-def-nat
-  '(data Nat 0
+  '(data Nat
          ((zero)
           (succ (_ : (Nat))))))
 
@@ -16,33 +16,35 @@
     `(@ Nat succ & ,res)))
 
 (define ind-def-unit
-  '(data Unit 0
+  '(data Unit
          ((tt))))
 
 (define ind-def-void
-  '(data Void 0
+  '(data Void
          ()))
 
 (define ind-def-eq-nat
-  '(data EqNat 0 (n1 : (Nat)) (n2 : (Nat))
+  '(data EqNat (n1 : (Nat)) (n2 : (Nat))
          ((refl-nat (_ : ((elim Nat n1 as (λ (_) (Π (_ : (Nat)) (□ 0))) rec f1 with
                                [(zero) => (λ (n2 : (Nat))
                                             (elim Nat n2 as (λ (_) (□ 0)) rec _ with
                                                   [(zero) => (Unit)]
                                                   [(succ _) => (Void)]))]
-                               [(succ n1^) => (λ (n2 : (Nat))
-                                                (elim Nat n2 as (λ (_) (□ 0)) rec f2 with
-                                                      [(zero) => (Void)]
-                                                      [(succ n2^) => ((f1 n1^) n2^)]))])
+                               [(succ n1^)
+                                =>
+                                (λ (n2 : (Nat))
+                                  (elim Nat n2 as (λ (_) (□ 0)) rec _ with
+                                        [(zero) => (Void)]
+                                        [(succ n2^) => ((f1 n1^) n2^)]))])
                           n2))))))
 
 (define ind-def-bool
-  '(data bool 0
+  '(data bool
          ((true)
           (false))))
 
 (define ind-def-list
-  `(data List 0 (A : (□ 0))
+  `(data List (A : (□ 0))
          ([null]
           [cons (_ : A) (_ : (List A))])))
 
