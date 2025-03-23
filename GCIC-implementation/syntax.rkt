@@ -8,13 +8,14 @@
 (struct Var (name) #:transparent)
 (struct Univ (level) #:transparent)
 (struct App (rator rand) #:transparent)
-(struct Lam (fparam type body) #:transparent)
-(struct Pi (fparam type body) #:transparent)
+(struct Lam (fparam orig-fparam type body) #:transparent)
+(struct Pi (fparam orig-fparam type body) #:transparent)
 (struct IndT (name level params) #:transparent)
 (struct Constr (ind-name name level params args) #:transparent)
-(struct IndElim (ind-name scrut pred-fparam pred-body rec-name branches)
+(struct IndElim (ind-name scrut pred-fparam orig-pred-fparam
+                          pred-body rec-name orig-rec-name branches)
   #:transparent)
-(struct branch (constr-name arg-names body))
+(struct Branch (constr-name arg-names orig-arg-names body) #:transparent)
 
 ;; Terms used only in GCIC surface language
 (struct UnkSurf (level) #:transparent)
@@ -59,15 +60,14 @@
 ;; A Telescope is an association list whose keys are identifiers and values are
 ;; types which refer to previous keys
 (define (parse-telescope telescope prev-defs (scope (seteqv)))
-  (match telescope
-    ['() '()]
-    [`((,var : ,type) . ,rest-telescope)
-     #:when (symbol? var)
-     (dict-set (parse-telescope rest-telescope prev-defs
-                                (set-add scope var))
-               var
-               (parse-term type prev-defs scope))]
-    [_ (error 'parse-telescope "Invalid telescope ~a" telescope)]))
+  (for/fold ([result '()]
+             [scope scope]
+             #:result result)
+            ([index:type telescope])
+    (match-define `(,index : ,type) index:type)
+    (values
+     (dict-set result index (parse-term type prev-defs scope))
+     (set-add scope index))))
 
 (define (parse-constr-defs constrs ind-name prev-defs scope)
   (match constrs
@@ -104,10 +104,10 @@
        [else (error 'parse-term "Free variable found: ~a" y)])]
     [`(λ (,x : ,T) ,body)
      #:when (symbol? x)
-     (Lam x (recurse T) (parse-term body defs (set-add scope x)))]
+     (Lam x x (recurse T) (parse-term body defs (set-add scope x)))]
     [`(Π (,x : ,T) ,body)
      #:when (symbol? x)
-     (Pi x (recurse T) (parse-term body defs (set-add scope x)))]
+     (Pi x x (recurse T) (parse-term body defs (set-add scope x)))]
     [`(@ ,ind-name ,constr-name ,@params & ,@args)
      #:when (and (symbol? ind-name) (symbol? constr-name))
      (cond
@@ -142,8 +142,8 @@
                "~a branches in inductive elimination doesn't match with the "
                "number of constructors in definition of inductive type '~a'")
               ind-name))
-     (IndElim ind-name (recurse scrut) z
-              (parse-term P defs (set-add scope z)) f
+     (IndElim ind-name (recurse scrut) z z
+              (parse-term P defs (set-add scope z)) f f
               (parse-elim-branches branches ind-name defs (set-add scope f)))]
     [`(,ind-name . ,params)
      #:when (and (dict-has-key? defs ind-name))
@@ -176,7 +176,7 @@
        (for/fold ([scope scope])
                  ([arg-name arg-names])
          (set-add scope arg-name)))
-     (cons (branch constr-name arg-names
+     (cons (Branch constr-name arg-names arg-names
                    (parse-term body defs extended-scope))
            (parse-elim-branches rest-branches ind-name defs scope))]))
 
@@ -215,7 +215,7 @@
      (set-add scope (car index/type)))))
 
 (define (unparse-term term [scope (seteqv)] [check-free? #t])
-  (define (recurse t) (unparse-term t scope))
+  (define (recurse t) (unparse-term t scope check-free?))
   (match term
     ;; GCIC-only term
     [(UnkSurf level) `(? ,level)]
@@ -235,19 +235,19 @@
           [(set-member? scope name) name]
           [else (error 'unparse-term "Free variable found: ~a" name)])]
        [else name])]
-    [(Lam x T body)
-     `(λ (,x : ,(recurse T)) ,(unparse-term body (set-add scope x)))]
-    [(Pi x T body)
-     `(Π (,x : ,(recurse T)) ,(unparse-term body (set-add scope x)))]
+    [(Lam x _ T body)
+     `(λ (,x : ,(recurse T)) ,(unparse-term body (set-add scope x) check-free?))]
+    [(Pi x _ T body)
+     `(Π (,x : ,(recurse T)) ,(unparse-term body (set-add scope x) check-free?))]
     [(Constr ind-name constr-name level params args)
      (cond
        [(zero? level) `(@ ,ind-name ,constr-name ,@(map recurse params) & ,@(map recurse args))]
        [else `(@ ,ind-name ,constr-name ,level ,@(map recurse params) & ,@(map recurse args))])]
-    [(IndElim ind-name scrut z P f branches)
+    [(IndElim ind-name scrut z _ P f _ branches)
      `(elim ,ind-name ,(recurse scrut)
-            as (λ (,z) ,(unparse-term P (set-add scope z)))
+            as (λ (,z) ,(unparse-term P (set-add scope z) check-free?))
             rec ,f with .
-            ,(unparse-elim-branches branches (set-add scope f)))]
+            ,(unparse-elim-branches branches (set-add scope f) check-free?))]
     [(IndT name level params)
      (cond
        [(zero? level) `(,name . ,(map recurse params))]
@@ -256,14 +256,14 @@
     [(App rator rand) `(,(recurse rator) ,(recurse rand))]
     [_ (error 'unparse-term "Invalid term: ~a" term)]))
 
-(define (unparse-elim-branches branches scope)
+(define (unparse-elim-branches branches scope [check-free? #t])
   (for/list ([b branches])
-    (match-define (branch constr-name arg-names body) b)
+    (match-define (Branch constr-name arg-names _ body) b)
     (define extended-scope
       (for/fold ([scope^ scope])
                 ([arg-name arg-names])
         (set-add scope^ arg-name)))
-    `((,constr-name . ,arg-names) => ,(unparse-term body extended-scope))))
+    `((,constr-name . ,arg-names) => ,(unparse-term body extended-scope check-free?))))
 
 (define debug? (make-parameter #f))
 
@@ -390,7 +390,7 @@
          (debug-log (format "Invalid telescope segment: ~a" index/type))
          (return #f)]))))
 
-(define (gcic-term? term defs scope)
+(define (gcic-term? term defs [scope (seteqv)])
   (match term
     [(UnkSurf level)
      (cond
@@ -401,7 +401,7 @@
        [else #t])]
     [_ (*cic-term? gcic-term? term defs scope)]))
 
-(define (ccic-term? term defs scope)
+(define (ccic-term? term defs [scope (seteqv)])
   (match term
     [(or (Unk type) (Err type))
      (define-values (term-struct _) (struct-info term))
@@ -453,7 +453,7 @@
         (debug-log (format "Free variable found: ~a" term))
         #f]
        [else #t])]
-    [(or (Lam x T body) (Pi x T body))
+    [(or (Lam x _ T body) (Pi x _ T body))
      (define-values (term-struct _) (struct-info term))
      (define-values (term-name _1 _2 _3 _4 _5 _6 _7) (struct-type-info term-struct))
      (cond
@@ -512,7 +512,7 @@
                     args))
         #f]
        [else #t])]
-    [(IndElim ind-name scrut z P f branches)
+    [(IndElim ind-name scrut z _ P f _ branches)
      (cond
        [(not (dict-has-key? defs ind-name))
         (debug-log (format
@@ -603,7 +603,7 @@
 
 (define (*cic-elim-branches? term? branches ind-name defs scope)
   (for/and ([b branches])
-    (match-define (branch constr-name arg-names body) b)
+    (match-define (Branch constr-name arg-names _ body) b)
     (cond
       [(not (dict-has-key? (ind-def-constrs (dict-ref defs ind-name)) constr-name))
        (debug-log (format "Constructor name '~a' not found in definition of inductive type '~a'"
@@ -660,12 +660,12 @@
     [`(,(Var name1) ,(Var name2))
      #:when (eqv? (index-of scope1 name1) (index-of scope2 name2))
      #t]
-    [`(,(Lam x1 T1 body1) ,(Lam x2 T2 body2))
+    [`(,(Lam x1 _ T1 body1) ,(Lam x2 _ T2 body2))
      #:when (and
              (self T1 T2 scope1 scope2)
              (self body1 body2 (cons x1 scope1) (cons x2 scope2)))
      #t]
-    [`(,(Pi x1 T1 body1) ,(Pi x2 T2 body2))
+    [`(,(Pi x1 _ T1 body1) ,(Pi x2 _ T2 body2))
      #:when (and
              (self T1 T2 scope1 scope2)
              (self body1 body2 (cons x1 scope1) (cons x2 scope2)))
@@ -684,8 +684,8 @@
                            [arg2 args2])
                    (self arg1 arg2 scope1 scope2)))
      #t]
-    [`(,(IndElim ind-name scrut1 z1 P1 f1 branches1)
-       ,(IndElim ind-name scrut2 z2 P2 f2 branches2))
+    [`(,(IndElim ind-name scrut1 z1 _ P1 f1 _ branches1)
+       ,(IndElim ind-name scrut2 z2 _ P2 f2 _ branches2))
      #:when (and (self scrut1 scrut2 scope1 scope2)
                  (self P1 P2 (cons z1 scope1) (cons z2 scope2))
                  (elim-branches-*α self branches1 branches2
@@ -695,15 +695,16 @@
      #:when (and (self rator1 rator2 scope1 scope2)
                  (self rand1 rand2 scope1 scope2))
      #t]
-    [_ (debug-log (format "Not related:~n Term 1:~a~n Term 2:~a~n" t1 t2))
+    [_ (debug-log (format "Not related:~n Term 1:~a~n Term 2:~a~n Scope1:~a~n Scope2:~a~n"
+                          t1 t2 scope1 scope2))
        #f]))
 
 (define (elim-branches-*α term-*α? branches1 branches2 scope1 scope2)
   (for/and ([branch1 branches1]
             [branch2 branches2])
     (match `(,branch1 ,branch2)
-      [`(,(branch constr-name arg-names1 body1)
-         ,(branch constr-name arg-names2 body2))
+      [`(,(Branch constr-name arg-names1 _ body1)
+         ,(Branch constr-name arg-names2 _ body2))
        #:when (term-*α? body1 body2
                         (append arg-names1 scope1) (append arg-names2 scope2))
        #t]
@@ -712,42 +713,50 @@
                           branch1 branch2))
        #f])))
 
-(define (subst term for-symbol in-term)
-  (define (recurse t) (subst term for-symbol t))
+;; Parallel capture-avoiding substitution
+(define (subst terms for-symbols in-term)
+  (define (recurse t) (subst terms for-symbols t))
   (match in-term
     [(Univ level) in-term]
     [(Var name)
+     (define s (map cons for-symbols terms))
      (cond
-       [(eqv? name for-symbol) term]
+       [(dict-has-key? s name)
+        ;; May or may not need to make 's' a hash table for faster lookup in the
+        ;; future. Currently, the size of 's' is bounded by the number of
+        ;; parameters and arguments in an inductive type and its constructors
+        ;; which shouldn't be that long. Once this is no longer true, we will
+        ;; need to optimize dict-ref lookup.
+        (dict-ref s name)]
        [else (Var name)])]
-    [(Lam y T body)
+    [(Lam y orig-y T body)
      (define-values (y^ body^)
-       (subst-binder term for-symbol y body))
-     (Lam y^ (recurse T) body^)]
-    [(Pi y T body)
+       (subst-binder terms for-symbols y orig-y body))
+     (Lam y^ orig-y (recurse T) body^)]
+    [(Pi y orig-y T body)
      (define-values (y^ body^)
-       (subst-binder term for-symbol y body))
-     (Pi y^ (recurse T) body^)]
+       (subst-binder terms for-symbols y orig-y body))
+     (Pi y^ orig-y (recurse T) body^)]
     [(Constr ind-name constr-name level params args)
      (Constr ind-name constr-name level
              (map recurse params)
              (map recurse args))]
     [(IndT name level params)
      (IndT name level (map recurse params))]
-    [(IndElim ind-name scrut z P f branches)
+    [(IndElim ind-name scrut z orig-z P f orig-f branches)
      (define-values (z^ P^)
-       (subst-binder term for-symbol z P))
+       (subst-binder terms for-symbols z orig-z P))
      (define-values (f^ branches^)
        (cond
-         [(eqv? f for-symbol) (values f branches)]
+         [(memv f for-symbols) (values f branches)]
          [else
-          (define fresh-f (fresh-name f))
+          (define fresh-f (fresh-name orig-f))
           (values
            fresh-f
-           (subst-elim-branches term for-symbol
-                                (subst-elim-branches (Var fresh-f)
-                                                     f branch)))]))
-     (IndElim ind-name (recurse scrut) z^ P^ f^ branches^)]
+           (subst-elim-branches terms for-symbols
+                                (subst-elim-branches `(,(Var fresh-f))
+                                                     `(,f) branches)))]))
+     (IndElim ind-name (recurse scrut) z^ orig-z P^ f^ orig-f branches^)]
     [(App rator rand)
      (App (recurse rator) (recurse rand))]
 
@@ -758,33 +767,32 @@
     [(Err type)
      (Err (recurse type))]))
 
-(define (subst-elim-branches term for-symbol in-branches)
+(define (subst-elim-branches terms for-symbols in-branches)
   (for/list ([b in-branches])
-    (match-define (branch constr-name arg-names body) b)
+    (match-define (Branch constr-name arg-names orig-arg-names body) b)
     (cond
-      [(memv for-symbol arg-names) b]
+      [(null? (remv* arg-names for-symbols))
+       ;; the symbols being subsitituted for will all be bound in the branch body
+       b]
       [else
-       (define-values (arg-names^ body^)
-         (for/fold ([arg-names^ '()]
-                    [body^ body]
-                    #:result (subst term for-symbol body))
-                   ([arg-name arg-names])
-           (define fresh-arg-name (fresh-name arg-name))
-           (values (append arg-names^ `(,fresh-arg-name))
-                   ;; This can be optimized by using parallel substitution
-                   (subst (Var fresh-arg-name) arg-name body^))))
-       (branch constr-name arg-names^ body^)])))
+       (define fresh-arg-names (map fresh-name orig-arg-names))
+       (define body^
+         (subst terms for-symbols
+                (subst (map Var fresh-arg-names) arg-names body)))
+       (Branch constr-name fresh-arg-names orig-arg-names body^)])))
 
-(define (subst-binder term for-symbol bind-name in-term)
+(define (subst-binder terms for-symbols bind-name orig-bind-name in-term)
   (cond
-    [(eqv? bind-name for-symbol) (values bind-name in-term)]
+    [(null? (remv bind-name for-symbols))
+     ;; the symbol being subsitituted for will be bound in the in-term
+     (values bind-name in-term)]
     [else
-     (define fresh-bind-name (fresh-name bind-name))
+     (define fresh-bind-name (fresh-name orig-bind-name))
      (values
       fresh-bind-name
-      (subst term for-symbol
-             (subst (Var fresh-bind-name)
-                    bind-name in-term)))]))
+      (subst terms for-symbols
+             (subst `(,(Var fresh-bind-name))
+                    `(,bind-name) in-term)))]))
 
 (define (fresh-name name)
   (gensym (string->symbol (string-append (symbol->string name) "_"))))

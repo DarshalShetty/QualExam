@@ -42,31 +42,86 @@
 (check-true (gcic-program? (parse prog-eq-nat-2)))
 
 (define term-subst-test
-  (Lam 'f
-       (Pi '_  (Var 'X) (Var 'X))
-       (Lam 'X
+  (Lam 'f 'f
+       (Pi '_ '_ (Var 'X) (Var 'X))
+       (Lam 'X 'X
             (Univ 0)
-            (Lam 'x
+            (Lam 'x 'x
                  (Var 'X)
                  (App (Var 'f) (Var 'x))))))
 
-(check-true (=α (subst (IndT 'Nat 0 '()) 'X term-subst-test)
-                (Lam 'f
-                     (Pi '_ (IndT 'Nat 0 '()) (IndT 'Nat 0 '()))
-                     (Lam 'X
-                          (Univ 0)
-                          (Lam 'x
-                               (Var 'X)
-                               (App (Var 'f) (Var 'x)))))))
+(let ([actual (subst `(,(Univ 1)) '(X) term-subst-test)])
+  (check-true (ccic-term? actual '()))
+  (check-true (=α actual
+                  (Lam 'f 'f
+                       (Pi '_ '_ (Univ 1) (Univ 1))
+                       (Lam 'X 'X
+                            (Univ 0)
+                            (Lam 'x 'x
+                                 (Var 'X)
+                                 (App (Var 'f) (Var 'x))))))))
 
-(check-true (=α (subst (Var 'f) 'X term-subst-test)
-                (Lam 'f^
-                     (Pi '_ (Var 'f) (Var 'f))
-                     (Lam 'X
-                          (Univ 0)
-                          (Lam 'x
-                               (Var 'X)
-                               (App (Var 'f^) (Var 'x)))))))
+(let ([actual (subst `(,(Var 'f)) '(X) term-subst-test)])
+  (check-true (ccic-term? actual '() (seteqv 'f)))
+  (check-true (=α actual
+                  (Lam 'f^ 'f
+                       (Pi '_ '_ (Var 'f) (Var 'f))
+                       (Lam 'X 'X
+                            (Univ 0)
+                            (Lam 'x 'x
+                                 (Var 'X)
+                                 (App (Var 'f^) (Var 'x))))))))
+
+(define parsed-term-sum (parse-term fun-add (parse-defs `(,ind-def-nat))))
+(let ([actual (subst `(,(Var 'y)) '(m) parsed-term-sum)])
+  (check-true (ccic-term? actual
+                          (parse-defs `(,ind-def-nat))
+                          (seteqv 'y)))
+  (check-equal? actual parsed-term-sum))
+
+(let ([actual (subst `(,(Var 'y)) '(n) parsed-term-sum)])
+  (check-true (ccic-term? actual
+                          (parse-defs `(,ind-def-nat))
+                          (seteqv 'y)))
+  (check-not-equal? actual parsed-term-sum)
+  (check-true (=α actual parsed-term-sum)))
+
+(let ([actual (subst `(,(Var 'z) ,(Var 'y)) '(m n) parsed-term-sum)])
+  (check-true (ccic-term? actual
+                          (parse-defs `(,ind-def-nat))
+                          (seteqv 'y)))
+  (check-not-equal? actual parsed-term-sum)
+  (check-true (=α actual parsed-term-sum)))
+
+(check-equal? (car
+               (subst-elim-branches
+                `(,(Var 'y)) '(n)
+                (list
+                 (Branch 'succ '(n) '(n) (Var 'n)))))
+              (Branch 'succ '(n) '(n) (Var 'n)))
+
+(let ([b (Branch 'succ '(l m n o) '(l m n o)
+                 (App (Var 'l)
+                      (App (Var 'm)
+                           (App (Var 'n)
+                                (App (Var 'o)
+                                     (Var 'p))))))])
+  (check-equal? (car
+                 (subst-elim-branches
+                  `(,(Var 'w) ,(Var 'x) ,(Var 'y) ,(Var 'z)) '(l m n o)
+                  (list b)))
+                b)
+  (check-equal? (car
+                 (subst-elim-branches
+                  `(,(Var 'x) ,(Var 'y) ,(Var 'z)) '(m n o)
+                  (list b)))
+                b)
+  (let ([actual (car
+                 (subst-elim-branches
+                  `(,(Var 'v) ,(Var 'w) ,(Var 'x) ,(Var 'y) ,(Var 'p)) '(l m n o p)
+                  (list b)))])
+    (check-not-equal? actual b)
+    (check-true (elim-branches-*α =α `(,actual) `(,b) (list) (list)))))
 
 ;;TODO:
 ;;- Add tests to ensure all errors in parse are triggered
