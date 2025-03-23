@@ -797,6 +797,40 @@
 (define (fresh-name name)
   (gensym (string->symbol (string-append (symbol->string name) "_"))))
 
+(define (subst-params defs ind-name level params)
+  ;; TODO: Figure out how to interpret level.
+  (define def (dict-ref defs ind-name))
+  (define params-tele (ind-def-param-tele def))
+  (for/fold ([subst-ptypes `(,(cdar params-tele))]
+             [prev-params `(,(car params))]
+             [prev-idxs `(,(caar params-tele))]
+             #:result subst-ptypes)
+            ([idx.ptype (cdr params-tele)]
+             [p (cdr params)])
+    (match-define `(,idx . ,ptype) idx.ptype)
+    (values
+     (append subst-ptypes `(,(subst prev-params prev-idxs ptype)))
+     (append prev-params `(,p))
+     (append prev-idxs `(,idx)))))
+
+(define (subst-args defs ind-name level constr-name params args)
+  ;; TODO: Figure out how to interpret level.
+  (define def (dict-ref defs ind-name))
+  (define params-tele (ind-def-param-tele def))
+  (define args-tele (constr-def-arg-tele
+                     (dict-ref (ind-def-constrs def) constr-name)))
+  (for/fold ([subst-atypes '()]
+             [prev-params-args params]
+             [prev-idxs (map car params-tele)]
+             #:result subst-atypes)
+            ([idx.atype args-tele]
+             [a args])
+    (match-define `(,idx . ,atype) idx.atype)
+    (values
+     (append subst-atypes `(,(subst prev-params-args prev-idxs atype)))
+     (append prev-params-args `(,a))
+     (append prev-idxs `(,idx)))))
+
 (define (debug-log message)
   (when (debug?)
       (printf "~a~n" message)))
