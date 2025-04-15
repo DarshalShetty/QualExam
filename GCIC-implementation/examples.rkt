@@ -48,6 +48,19 @@
          ([null]
           [cons (_ : A) (_ : (List A))])))
 
+(define (encode-list-nat ls)
+  (for/foldr ([res '(@ List null (Nat) &)])
+             ([l ls])
+    `(@ List cons (Nat) & ,(encode-nat l) ,res)))
+
+(define ind-def-vec-f
+  '(data VecF (A : (□ 0)) (n : (Nat))
+         ((nil-f (_ : (EqNat (encode-nat 0) n)))
+          (cons-f (_ : A)
+                  (m : (Nat))
+                  (_ : (EqNat (@ Nat succ & m) n))
+                  (_ : (VecF A m))))))
+
 (define prog-nat-one
   `(,default-variant
     ,ind-def-nat
@@ -59,6 +72,22 @@
     ,ind-def-list
     (@ List cons (Nat) & ,(encode-nat 1)
        (@ List null (Nat) &))))
+
+(define fun-append
+  '(λ (A : (□ 0))
+     (λ (l1 : (List A))
+       (λ (l2 : (List A))
+         (elim List l1 as (λ (_) (List A)) rec append-l2 with
+               [(null) => l2]
+               [(cons hd tl) => (@ List cons A & hd (append-l2 tl))])))))
+
+(define prog-list-append-12-34
+  `(,default-variant
+    ,ind-def-nat
+    ,ind-def-list
+    (((,fun-append (Nat))
+      ,(encode-list-nat '(1 2)))
+     ,(encode-list-nat '(3 4)))))
 
 (define prog-omega
   `(,default-variant
@@ -81,11 +110,20 @@
 
 (define term-two
   (encode-nat 2))
+(define term-three
+  (encode-nat 3))
 
 (define prog-add-2-3
   `(,default-variant
     ,ind-def-nat
-    ((,fun-add ,term-two) ,term-two)))
+    ((,fun-add ,term-two) ,term-three)))
+
+(define (term-δ i)
+  ;; reason for add1 is explained in section 5.3 of the GCIC paper
+  `(λ (x : (? ,(add1 i))) (x x)))
+
+(define (term-Ω i)
+  `(,(term-δ i) ,(term-δ i)))
 
 (define prog-eq-nat-2
   `(,default-variant

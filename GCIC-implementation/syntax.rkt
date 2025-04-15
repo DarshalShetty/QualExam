@@ -66,7 +66,7 @@
             ([index:type telescope])
     (match-define `(,index : ,type) index:type)
     (values
-     (dict-set result index (parse-term type prev-defs scope))
+     (cons (cons index (parse-term type prev-defs scope)) result )
      (set-add scope index))))
 
 (define (parse-constr-defs constrs ind-name prev-defs scope)
@@ -126,7 +126,8 @@
                constr-name ind-name)]
        [(and (not (null? params)) (natural? (car params)))
         ;; first param is actually the universe level
-        (Constr ind-name constr-name (car params) (map recurse (cdr params)) (map recurse args))]
+        (Constr ind-name constr-name (car params)
+                (map recurse (cdr params)) (map recurse args))]
        [else
         ;; set default universe level to 0
         (Constr ind-name constr-name 0 (map recurse params) (map recurse args))])]
@@ -281,8 +282,8 @@
        [(not (memv variant-name supported-variants))
         (debug-log (format "Unsupported GCIC variant: ~a" variant-name))
         #f]
-       [(not (dict? defs))
-        (debug-log (format "Defintion table in a program must be a dictionary, but found ~a" defs))
+       [(not (and (dict? defs) (list? defs)))
+        (debug-log (format "Defintion table in a program must be an association list dictionary, but found ~a" defs))
         #f]
        [(not (*cic-defs? term? defs))
         (debug-log (format "Program should have valid definitions, but found: ~a"
@@ -325,6 +326,7 @@
         [else
          (define prev-defs^ (dict-set prev-defs name def))
          (cond
+           ;; TODO: add check to see if param-types is an assoc list
            [(not (*cic-telescope? term? param-types prev-defs^))
             (debug-log (format
                         (string-append
@@ -340,15 +342,14 @@
                         constrs))
             (return #f)]
            [(*cic-constr-defs? term? constrs prev-defs^
-                               (list->seteqv (map car param-types)) name)
+                               (list->seteqv (map car param-types)))
             (values #t prev-defs^)]
            [else
             (debug-log (format "Invalid inductive definition: ~a" def))
             (return #f)])]))))
 
-(define (*cic-constr-defs? term? constrs prev-defs scope name)
-  (for/and ([constr (dict-values constrs)]
-            [key-name (dict-keys constrs)])
+(define (*cic-constr-defs? term? constrs prev-defs scope)
+  (for/and ([(key-name constr ) (in-dict constrs)])
     (match-define (constr-def name arg-tele) constr)
     (cond
       [(not (symbol? name))
@@ -364,6 +365,7 @@
                                   ", but is '~a' in the definition itself.")
                    key-name name))
        #f]
+      ;; TODO: add check to see if arg-tele is an assoc list
       [(not (*cic-telescope? term? arg-tele prev-defs scope))
        (debug-log (format (string-append
                            "Invalid argument declaration in the"
@@ -377,8 +379,8 @@
     (for/fold ([result #t]
                [scope scope]
                #:result result)
-              ([index/type telescope])
-      (match-define (cons index type) index/type)
+              ([index.type telescope])
+      (match-define (cons index type) index.type)
       (cond
         [(not (symbol? index))
          (debug-log (format
@@ -387,7 +389,7 @@
          (return #f)]
         [(term? type defs scope) (values #t (set-add scope index))]
         [else
-         (debug-log (format "Invalid telescope segment: ~a" index/type))
+         (debug-log (format "Invalid telescope segment: ~a" index.type))
          (return #f)]))))
 
 (define (gcic-term? term defs [scope (seteqv)])
@@ -715,57 +717,61 @@
 
 ;; Parallel capture-avoiding substitution
 (define (subst terms for-symbols in-term)
-  (define (recurse t) (subst terms for-symbols t))
-  (match in-term
-    [(Univ level) in-term]
-    [(Var name)
-     (define s (map cons for-symbols terms))
-     (cond
-       [(dict-has-key? s name)
-        ;; May or may not need to make 's' a hash table for faster lookup in the
-        ;; future. Currently, the size of 's' is bounded by the number of
-        ;; parameters and arguments in an inductive type and its constructors
-        ;; which shouldn't be that long. Once this is no longer true, we will
-        ;; need to optimize dict-ref lookup.
-        (dict-ref s name)]
-       [else (Var name)])]
-    [(Lam y orig-y T body)
-     (define-values (y^ body^)
-       (subst-binder terms for-symbols y orig-y body))
-     (Lam y^ orig-y (recurse T) body^)]
-    [(Pi y orig-y T body)
-     (define-values (y^ body^)
-       (subst-binder terms for-symbols y orig-y body))
-     (Pi y^ orig-y (recurse T) body^)]
-    [(Constr ind-name constr-name level params args)
-     (Constr ind-name constr-name level
-             (map recurse params)
-             (map recurse args))]
-    [(IndT name level params)
-     (IndT name level (map recurse params))]
-    [(IndElim ind-name scrut z orig-z P f orig-f branches)
-     (define-values (z^ P^)
-       (subst-binder terms for-symbols z orig-z P))
-     (define-values (f^ branches^)
-       (cond
-         [(memv f for-symbols) (values f branches)]
-         [else
-          (define fresh-f (fresh-name orig-f))
-          (values
-           fresh-f
-           (subst-elim-branches terms for-symbols
-                                (subst-elim-branches `(,(Var fresh-f))
-                                                     `(,f) branches)))]))
-     (IndElim ind-name (recurse scrut) z^ orig-z P^ f^ orig-f branches^)]
-    [(App rator rand)
-     (App (recurse rator) (recurse rand))]
+  (cond
+    [(or (null? terms) (null? for-symbols))
+     in-term]
+    [else
+     (define (recurse t) (subst terms for-symbols t))
+     (match in-term
+       [(Univ level) in-term]
+       [(Var name)
+        (define s (map cons for-symbols terms))
+        (cond
+          [(dict-has-key? s name)
+           ;; May or may not need to make 's' a hash table for faster lookup in the
+           ;; future. Currently, the size of 's' is bounded by the number of
+           ;; parameters and arguments in an inductive type and its constructors
+           ;; which shouldn't be that long. Once this is no longer true, we will
+           ;; need to optimize dict-ref lookup.
+           (dict-ref s name)]
+          [else (Var name)])]
+       [(Lam y orig-y T body)
+        (define-values (y^ body^)
+          (subst-binder terms for-symbols y orig-y body))
+        (Lam y^ orig-y (recurse T) body^)]
+       [(Pi y orig-y T body)
+        (define-values (y^ body^)
+          (subst-binder terms for-symbols y orig-y body))
+        (Pi y^ orig-y (recurse T) body^)]
+       [(Constr ind-name constr-name level params args)
+        (Constr ind-name constr-name level
+                (map recurse params)
+                (map recurse args))]
+       [(IndT name level params)
+        (IndT name level (map recurse params))]
+       [(IndElim ind-name scrut z orig-z P f orig-f branches)
+        (define-values (z^ P^)
+          (subst-binder terms for-symbols z orig-z P))
+        (define-values (f^ branches^)
+          (cond
+            [(memv f for-symbols) (values f branches)]
+            [else
+             (define fresh-f (fresh-name orig-f))
+             (values
+              fresh-f
+              (subst-elim-branches terms for-symbols
+                                   (subst-elim-branches `(,(Var fresh-f))
+                                                        `(,f) branches)))]))
+        (IndElim ind-name (recurse scrut) z^ orig-z P^ f^ orig-f branches^)]
+       [(App rator rand)
+        (App (recurse rator) (recurse rand))]
 
-    [(Cast term source target)
-     (Cast (recurse term) (recurse source) (recurse target))]
-    [(Unk type)
-     (Unk (recurse type))]
-    [(Err type)
-     (Err (recurse type))]))
+       [(Cast term source target)
+        (Cast (recurse term) (recurse source) (recurse target))]
+       [(Unk type)
+        (Unk (recurse type))]
+       [(Err type)
+        (Err (recurse type))])]))
 
 (define (subst-elim-branches terms for-symbols in-branches)
   (for/list ([b in-branches])
@@ -801,17 +807,20 @@
   ;; TODO: Figure out how to interpret level.
   (define def (dict-ref defs ind-name))
   (define params-tele (ind-def-param-tele def))
-  (for/fold ([subst-ptypes `(,(cdar params-tele))]
-             [prev-params `(,(car params))]
-             [prev-idxs `(,(caar params-tele))]
-             #:result subst-ptypes)
-            ([idx.ptype (cdr params-tele)]
-             [p (cdr params)])
-    (match-define `(,idx . ,ptype) idx.ptype)
-    (values
-     (append subst-ptypes `(,(subst prev-params prev-idxs ptype)))
-     (append prev-params `(,p))
-     (append prev-idxs `(,idx)))))
+  (cond
+    [(or (null? params) (null? params-tele)) '()]
+    [else
+     (for/fold ([subst-ptypes `(,(cdar params-tele))]
+                [prev-params `(,(car params))]
+                [prev-idxs `(,(caar params-tele))]
+                #:result subst-ptypes)
+               ([idx.ptype (cdr params-tele)]
+                [p (cdr params)])
+       (match-define `(,idx . ,ptype) idx.ptype)
+       (values
+        (append subst-ptypes `(,(subst prev-params prev-idxs ptype)))
+        (append prev-params `(,p))
+        (append prev-idxs `(,idx))))]))
 
 (define (subst-args defs ind-name level constr-name params args)
   ;; TODO: Figure out how to interpret level.
@@ -834,3 +843,9 @@
 (define (debug-log message)
   (when (debug?)
       (printf "~a~n" message)))
+
+;; TODO: Turn this into a macro so that the arguments are not evaluated if param
+;; is false
+(define ((trace-if-param param) msg . format-args)
+  (when (param)
+    (apply printf `(,(string-append msg "~n") . ,format-args))))
