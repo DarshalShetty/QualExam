@@ -12,6 +12,7 @@
                   unparse-defs unparse-term
                   ccic-term? *cic-telescope?
                   fresh-name subst subst-args ;subst-params
+                  =α
                   get-params debug-log trace-if-param))
 
 (require (only-in "evaluation.rkt"
@@ -25,6 +26,7 @@
        (immutable? Γ)
        (*cic-telescope? ccic-term? Γ defs)))
 
+(define unsafe-optimize? (make-parameter #f))
 
 ;; Γ ⊢ t ⇝ t^ ▹ T
 ; precondition: (and (context? Γ)
@@ -45,7 +47,7 @@
     [(Univ i)
      (trace-elab "~a Applying synthesis rule: UNIV" (make-string indent #\>))
      (values tᵍ (Univ (add1 i)))]
-    [(Pi x x Aᵍ Bᵍ)
+    [(Pi x x-orig Aᵍ Bᵍ)
      (trace-elab "~a Applying synthesis rule: PROD" (make-string indent #\>))
      (match-define-values
       (Aᶜ (Univ i))
@@ -55,8 +57,8 @@
       (constrain-synth
        (dict-set Γ x Aᶜ)
        Bᵍ (HeadUniv #f) defs (add1 indent)))
-     (values (Pi x x Aᶜ Bᶜ) (Univ (sΠ i j)))]
-    [(Lam x x Aᵍ tᵍ)
+     (values (Pi x x-orig Aᶜ Bᶜ) (Univ (sΠ i j)))]
+    [(Lam x x-orig Aᵍ tᵍ)
      (trace-elab "~a Applying synthesis rule: ABS" (make-string indent #\>))
      (match-define-values
       (Aᶜ (Univ i))
@@ -64,7 +66,7 @@
      (define-values
       (tᶜ Bᶜ)
       (synth (dict-set Γ x Aᶜ) tᵍ defs (add1 indent)))
-     (values (Lam x x Aᶜ tᶜ) (Pi x x Aᶜ Bᶜ))]
+     (values (Lam x x-orig Aᶜ tᶜ) (Pi x x-orig Aᶜ Bᶜ))]
     [(App tᵍ uᵍ)
      (trace-elab "~a Applying synthesis rule: APP" (make-string indent #\>))
      (match-define-values
@@ -144,8 +146,8 @@
             ([aᵍ asᵍ]
              [(index typeᶜ) (in-dict params-teleᶜ)])
     (define Γ-closed-typeᶜ (subst asᶜ subst-symbols typeᶜ))
-    (values (cons (check Γ aᵍ Γ-closed-typeᶜ defs (add1 indent)) asᶜ)
-            (cons index subst-symbols))))
+    (values (append asᶜ (list (check Γ aᵍ Γ-closed-typeᶜ defs (add1 indent))))
+            (append subst-symbols (list index )))))
 
 ;; Γ ⊢ b̃ₘ ◃ Argsₖ(I,i,cₖ)[a,b] ⇝ bₘ
 ; precondition: (and (context? Γ)
@@ -191,9 +193,9 @@
              [(index typeᶜ) (in-dict args-teleᶜ)])
     (define Γ-closed-typeᶜ (subst subst-terms subst-symbols typeᶜ))
     (define bᶜ (check Γ bᵍ Γ-closed-typeᶜ defs (add1 indent)))
-    (values (cons bᶜ bsᶜ)
-            (cons index subst-symbols)
-            (cons bᶜ subst-terms))))
+    (values (append bsᶜ (list bᶜ ))
+            (append subst-symbols (list index ))
+            (append subst-terms (list bᶜ)))))
 
 ;; Γ ⊢ t ◃ T ⇝ t^
 ; precondition: (and (context? Γ)
@@ -202,18 +204,37 @@
 ;                    (ccic-term? Sᶜ defs (apply seteqv (dict-keys Γ))))
 ; postcondition: (ccic-term? (check Γ tᵍ Sᶜ defs) defs (apply seteqv (dict-keys Γ)))
 (define (check Γ tᵍ Sᶜ defs indent)
-  (trace-elab "~a Checking term: ~a" (make-string indent #\>) (unparse-term tᵍ (list->seteqv (map car Γ))))
-  (trace-elab "~a Checking type: ~a" (make-string indent #\>) (unparse-term Sᶜ (list->seteqv (map car Γ))))
+  (trace-elab "~a Checking term: ~a"
+              (make-string indent #\>)
+              (unparse-term tᵍ (list->seteqv (map car Γ))))
+  (trace-elab "~a Checking type: ~a"
+              (make-string indent #\>)
+              (unparse-term Sᶜ (list->seteqv (map car Γ))))
   (define-values (tᶜ Tᶜ) (synth Γ tᵍ defs (add1 indent)))
-  (trace-elab "~a Synthesized type: ~a" (make-string indent #\>) (unparse-term Tᶜ (list->seteqv (map car Γ))))
-  (unless (~ Tᶜ Sᶜ defs (map car Γ))
-    (error 'check (string-append  "Checked type ~a and synthesized type ~a are not "
-                                  "consistently convertible while checking for term ~a")
+  (trace-elab "~a Synthesized type: ~a"
+              (make-string indent #\>)
+              (unparse-term Tᶜ (list->seteqv (map car Γ))))
+  (define-values (consistently-convertible? canon-Tᶜ canon-Sᶜ)
+    (~ Tᶜ Sᶜ defs (map car Γ)))
+  (unless consistently-convertible?
+    (error 'check (string-append  "Checked type and synthesized type are not "
+                                  "consistently convertible while checking for "
+                                  "term ~a.~n"
+                                  "Checked type=~n~a~n"
+                                  "Synthesized type=~n~a~n"
+                                  "Canonical checked type=~n~a~n"
+                                  "Canonical synthesized type=~n~a~n")
+           (unparse-term tᵍ (list->seteqv (map car Γ)))
            (unparse-term Sᶜ (list->seteqv (map car Γ)))
            (unparse-term Tᶜ (list->seteqv (map car Γ)))
-           (unparse-term tᵍ (list->seteqv (map car Γ)))))
-  ;; TODO: Figure out whether we can use evaluated versions of Tᶜ and Sᶜ instead below
-  (Cast tᶜ #;(evaluate Tᶜ defs) Tᶜ #;(evaluate Sᶜ defs) Sᶜ))
+           (unparse-term canon-Sᶜ (list->seteqv (map car Γ)))
+           (unparse-term canon-Tᶜ (list->seteqv (map car Γ)))))
+  ;; TODO: Figure out whether we can use evaluated canonical versions of Tᶜ and
+  ;; Sᶜ instead below
+  (cond
+    [(and (=α canon-Tᶜ canon-Sᶜ) (unsafe-optimize?)) tᶜ]
+    [(unsafe-optimize?) (Cast tᶜ canon-Tᶜ canon-Sᶜ)]
+    [else (Cast tᶜ Tᶜ Sᶜ)]))
 
 ;; Γ ⊢ t ⇝ t^ ▹∘ T
 ; precondition: (and (context? Γ)
@@ -225,12 +246,16 @@
 ;                       (ccic-term? Tᵍ defs (apply seteqv (dict-keys Γ)))
 ;                       (equal? hd (head T))))
 (define (constrain-synth Γ tᵍ hd defs indent)
-  ;; TODO: Figure out whether it is okay to use canon-Tᶜ instead of Tᶜ as
-  ;; the source type of the cast being returned in the *? rules.
   (trace-elab "~a Synthesizing type with head ~a for term: ~a"
               (make-string indent #\>) hd (unparse-term tᵍ (list->seteqv (map car Γ))))
   (define-values (tᶜ Tᶜ) (synth Γ tᵍ defs (add1 indent)))
   (define canon-Tᶜ (evaluate Tᶜ defs))
+  ;; TODO: Figure out whether it is okay to use canon-Tᶜ instead of Tᶜ as
+  ;; the source type of the cast being returned in the *? rules.
+  (define T^
+    (cond
+      [(unsafe-optimize?) canon-Tᶜ]
+      [else Tᶜ]))
   ;; TODO: refactor to use fewer matches
   (match hd
     [(HeadPi)
@@ -240,9 +265,10 @@
         (values tᶜ canon-Tᶜ)]
        [(Unk (Univ i))
         #:when (natural? (cΠ i))
-        (trace-elab "~a Applying constrained synthesis rule: INF-PROD?" (make-string indent #\>))
+        (trace-elab "~a Applying constrained synthesis rule: INF-PROD?"
+                    (make-string indent #\>))
         (define out-type (germ hd i defs))
-        (values (Cast tᶜ #;canon-Tᶜ Tᶜ out-type) out-type)]
+        (values (Cast tᶜ T^ out-type) out-type)]
        [_ (error 'constrain-synth
                  (string-append "Expected a type with head ~a or the type (? (□ i))"
                                 " where (cΠ i) >= 0, but got ~a while constrained "
@@ -251,13 +277,15 @@
     [(HeadUniv _)
      (match canon-Tᶜ
        [(Univ i)
-        (trace-elab "~a Applying constrained synthesis rule: INF-UNIV" (make-string indent #\>))
+        (trace-elab "~a Applying constrained synthesis rule: INF-UNIV"
+                    (make-string indent #\>))
         (values tᶜ canon-Tᶜ)]
        [(Unk (Univ j))
         #:when (> j 0)
-        (trace-elab "~a Applying constrained synthesis rule: INF-UNIV?" (make-string indent #\>))
+        (trace-elab "~a Applying constrained synthesis rule: INF-UNIV?"
+                    (make-string indent #\>))
         (define i (sub1 j))
-        (values (Cast tᶜ #;canon-Tᶜ Tᶜ (Univ i)) (Univ i))]
+        (values (Cast tᶜ T^ (Univ i)) (Univ i))]
        [_ (error 'constrain-synth
                  (string-append "Expected a type with head ~a or the type (? (□ i))"
                                 " where i > 0, but got ~a while constrained "
@@ -267,12 +295,14 @@
      (match canon-Tᶜ
        [(IndT I^ _ _)
         #:when (eqv? I I^)
-        (trace-elab "~a Applying constrained synthesis rule: INF-IND" (make-string indent #\>))
+        (trace-elab "~a Applying constrained synthesis rule: INF-IND"
+                    (make-string indent #\>))
         (values tᶜ canon-Tᶜ)]
        [(Unk (Univ i))
-        (trace-elab "~a Applying constrained synthesis rule: INF-IND?" (make-string indent #\>))
+        (trace-elab "~a Applying constrained synthesis rule: INF-IND?"
+                    (make-string indent #\>))
         (define out-type (germ hd i defs))
-        (values (Cast tᶜ #;canon-Tᶜ Tᶜ out-type) out-type)]
+        (values (Cast tᶜ T^ out-type) out-type)]
        [_ (error 'constrain-synth
                  (string-append "Expected a type with head ~a or the type (? (□ i))"
                                 ", but got ~a while constrained synthesis of term ~a")
@@ -332,7 +362,7 @@
              #:result tele^)
             ([(index type) (in-dict tele)])
     (define type^ (elab-term Γ^ type prev-defs))
-    (values (cons (cons index type^) tele^)
+    (values (append  tele^ `((,index . ,type^)))
             (dict-set Γ^ index type^))))
 
 ; precondition: (and (context? Γ)

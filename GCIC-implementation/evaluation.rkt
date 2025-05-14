@@ -148,7 +148,7 @@
      #f]))
 
 ; ∃ scope, defs . (and (ccic-term? term defs scope) (not (canonical-term? term))
-;                      (ccic-term? (reduce-principal defs term) defs scope))
+;                      (ccic-term? (reduce-if-principal defs term) defs scope))
 (define (reduce-if-principal defs term)
   (match term
     ;; CIC rules
@@ -410,6 +410,7 @@
      ;; hinted by neutral-term? cases.
      (refocus target (cons (FCastTrg term v) evalctx) defs)]
     [((cons (FCastSrc term target) evalctx) v)
+     ;; TODO: probably don't need this case
      (iterate `(,evalctx . ,(Cast term v target)) defs)]
     [((cons (FCastTrg term source) evalctx) (or (Pi _ _ _ _) (IndT _ _ _)))
      ;; Not a potential principal redex. Refocus to evaluating term as hinted by
@@ -430,13 +431,48 @@
 
 (define (~ t1 t2 defs [scope '()])
   (debug-log (format "Checking consistent conversion between ~a and ~a" t1 t2))
-  (define canon-t1 (evaluate t1 defs))
-  (define canon-t2 (evaluate t2 defs))
+  ;; TODO: Ensure whether this is how the GCIC paper intended it to be implemented.
+  (define canon-t1 (evaluate-subterms t1 defs))
+  (define canon-t2 (evaluate-subterms t2 defs))
   (debug-log (format (string-append
                       "Consistent conversion check will proceed to check"
                       " α-consistency between canonical terms ~a and ~a")
                      canon-t1 canon-t2))
-  (~α canon-t1 canon-t2 scope scope))
+  (values (~α canon-t1 canon-t2 scope scope)
+          canon-t1
+          canon-t2))
+
+;; Evaluates the arguments of head normal form terms. Useful for testing and
+;; debugging.
+(define (evaluate-subterms term defs)
+  (match (evaluate term defs)
+    [(cons evalctx t)
+     (error 'evaluate-subterms
+            "Stuck Evaluation.~nTerm:~n~a~nEvaluation context:~n~a~n"
+            (unparse-term t defs #f)
+            (unparse-evalctx evalctx))]
+    ;; no evaluation under binders
+    [(Lam x x-orig A t) (Lam x x-orig (evaluate-subterms A defs) t)]
+    [(Pi x x-orig A B) (Pi x x-orig (evaluate-subterms A defs) B)]
+    [(Univ i) term]
+    [(Constr I c i as bs)
+     (Constr I c i
+             (map (λ (a) (evaluate-subterms a defs)) as)
+             (map (λ (b) (evaluate-subterms b defs)) bs))]
+    [(IndT I i as)
+     (IndT I i (map (λ (a) (evaluate-subterms a defs)) as))]
+    [(or (Unk (and t (IndT _ _ _))) (Err (and t (IndT _ _ _))))
+     (Unk (evaluate-subterms t defs))]
+    [(and t
+          (or (Unk (or (Univ _) (Unk (Univ _)) (Err (Univ _))))
+              (Err (or (Univ _) (Unk (Univ _)) (Err (Univ _))))))
+     t]
+    [(Cast term source (Unk (Univ level)))
+     #:when (germ? source level)
+     (Cast (evaluate-subterms term defs) source (Unk (Univ level)))]
+    [c #:when (canonical-term? c) c]
+    [c (error 'evaluate-subterms "Expected a canonical term, but got ~a" c)]))
+
 #|
 (require racket/trace)
 (trace refocus refocus-aux iterate)

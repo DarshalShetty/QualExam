@@ -4,6 +4,12 @@
 (require "../syntax.rkt")
 (require "../examples.rkt")
 
+(define (check-program program)
+  (define parsed (parse program))
+  (check-equal? (last (unparse parsed)) (last program))
+
+  (check-true (gcic-program? parsed)))
+
 (check-equal? (parse '((variant gcic-n) (? 1)))
               (Program 'gcic-n '() (UnkSurf 1)))
 
@@ -11,9 +17,7 @@
                (parse prog-nat-one))
               (Constr 'Nat 'succ 0 '() (list (Constr 'Nat 'zero 0 '() '()))))
 
-(check-equal? (last (unparse (parse prog-nat-one))) (last prog-nat-one))
-
-(check-true (gcic-program? (parse prog-nat-one)))
+(check-program prog-nat-one)
 
 (check-equal? (Program-term
                (parse prog-list-nat-one))
@@ -25,21 +29,26 @@
                        (Constr 'List 'null 0
                                (list (IndT 'Nat 0 '())) '()))))
 
-(check-equal? (last (unparse (parse prog-list-nat-one))) (last prog-list-nat-one))
+(check-program prog-list-nat-one)
 
-(check-true (gcic-program? (parse prog-list-nat-one)))
+(check-program prog-list-append-12-34)
 
-(check-equal? (last (unparse (parse prog-omega))) (last prog-omega))
+(check-program prog-omega)
 
-(check-true (gcic-program? (parse prog-omega)))
+(check-program prog-scope)
 
-(check-equal? (last (unparse (parse prog-add-2-3))) (last prog-add-2-3))
+(check-program prog-add-2-3)
 
-(check-true (gcic-program? (parse prog-add-2-3)))
+(check-program prog-eq-nat-2)
 
-(check-equal? (last (unparse (parse prog-eq-nat-2))) (last prog-eq-nat-2))
+(check-program prog-vec-f-12)
 
-(check-true (gcic-program? (parse prog-eq-nat-2)))
+(check-program prog-vec-f-append-12-34)
+
+(check-program prog-vec-μ-12)
+
+(check-program prog-check-arg)
+
 
 (define term-subst-test
   (Lam 'f 'f
@@ -133,7 +142,8 @@
 (let ([actual (subst-params ind-defs-subst-test
                                 'I 0
                                 `(,(Univ 0)
-                                  ,(Constr 'List 'cons 1 `(,(Univ 0)) `(,(IndT 'Nat 0 '())))
+                                  ,(Constr 'List 'cons 1 `(,(Univ 0))
+                                           `(,(IndT 'Nat 0 '())))
                                   ,(Lam 'x 'x (Univ 0) (Var 'x))))])
   (check-true (for/and ([a actual])
                 (ccic-term? a ind-defs-subst-test)))
@@ -141,34 +151,44 @@
                         [e `(,(Univ 1)
                              ,(IndT 'List 0 `(,(Univ 0)))
                              ,(Pi 'f 'f (Univ 0)
-                                  (Constr 'List 'cons 1 `(,(Univ 0)) `(,(IndT 'Nat 0 '())))))])
+                                  (Constr 'List 'cons 1
+                                          `(,(Univ 0))
+                                          `(,(IndT 'Nat 0 '())))))])
                 (=α a e))))
 
 (let ([actual (subst-args ind-defs-subst-test
                                 'I 0 'iconstr
                                 `(,(Univ 0)
-                                  ,(Constr 'List 'cons 1 `(,(Univ 0)) `(,(IndT 'Nat 0 '())))
+                                  ,(Constr 'List 'cons 1
+                                           `(,(Univ 0))
+                                           `(,(IndT 'Nat 0 '())))
                                   ,(Lam 'x 'x (Univ 0) (Var 'x)))
                                 `(,(Constr 'List 'cons 1
                                            `(,(IndT 'Nat 0 '()))
-                                           `(,(parse-term term-two ind-defs-subst-test)))
-                                  ,(Lam 'f 'f (IndT 'List 1
-                                                    `(,(Constr 'List 'cons 1
-                                                               `(,(IndT 'Nat 0 '()))
-                                                               `(,(parse-term term-two
-                                                                              ind-defs-subst-test)))))
+                                           `(,(parse-term term-two
+                                                          ind-defs-subst-test)))
+                                  ,(Lam 'f 'f
+                                        (IndT 'List 1
+                                              `(,(Constr 'List 'cons 1
+                                                         `(,(IndT 'Nat 0 '()))
+                                                         `(,(parse-term
+                                                             term-two
+                                                             ind-defs-subst-test)))))
                                         (Var 'f))))])
   (check-true (for/and ([a actual])
                 (ccic-term? a ind-defs-subst-test)))
   (check-true (for/and ([a actual]
-                        [e `(,(IndT 'List 0 `(,(Constr 'List 'cons 1 `(,(Univ 0)) `(,(IndT 'Nat 0 '())))))
+                        [e `(,(IndT 'List 0
+                                    `(,(Constr 'List 'cons 1 `(,(Univ 0))
+                                               `(,(IndT 'Nat 0 '())))))
                              ,(Pi 'f 'f
                                   (IndT 'List 0
                                         (list (Constr 'List 'cons 1
                                                       `(,(IndT 'Nat 0 '()))
-                                                      `(,(parse-term term-two ind-defs-subst-test)))))
+                                                      `(,(parse-term
+                                                          term-two
+                                                          ind-defs-subst-test)))))
                                   (App (Lam 'x 'x (Univ 0) (Var 'x)) (Var 'f))))])
                 (=α a e))))
 
-;;TODO:
-;;- Add tests to ensure all errors in parse are triggered
+;;TODO: - Add tests to ensure all errors in parse are triggered

@@ -24,6 +24,8 @@
 (struct Unk (type) #:transparent)
 (struct Err (type) #:transparent)
 (struct Cast (term source target) #:transparent)
+;; Special value for CastCIC full reduction
+(struct Spine (neutral) #:transparent)
 
 (struct ind-def (name param-tele constrs) #:transparent)
 (struct constr-def (name arg-tele) #:transparent)
@@ -66,7 +68,7 @@
             ([index:type telescope])
     (match-define `(,index : ,type) index:type)
     (values
-     (cons (cons index (parse-term type prev-defs scope)) result )
+     (append result `((,index . ,(parse-term type prev-defs scope))))
      (set-add scope index))))
 
 (define (parse-constr-defs constrs ind-name prev-defs scope)
@@ -147,7 +149,7 @@
               (parse-term P defs (set-add scope z)) f f
               (parse-elim-branches branches ind-name defs (set-add scope f)))]
     [`(,ind-name . ,params)
-     #:when (and (dict-has-key? defs ind-name))
+     #:when (dict-has-key? defs ind-name)
      (cond
        [(and (not (null? params)) (natural? (car params)))
         ;; first param is actually the universe level
@@ -155,6 +157,10 @@
        [else
         ;; set default universe level to 0
         (IndT ind-name 0 (map recurse params))])]
+    [`(,ind-name . ,params)
+     #:when (and (not (dict-has-key? defs ind-name))
+                 (not (eqv? (length params) 1)))
+     (error 'parse-term "Inductive definition ~a not found." ind-name)]
     [`(,rator ,rand)
      (App (recurse rator) (recurse rand))]
     [_
@@ -208,12 +214,12 @@
 (define (unparse-telescope telescope scope)
   (for/fold ([result '()]
              [scope scope])
-            ([index/type telescope])
+    ([index.type telescope])
     (values
-     (cons
-      `(,(cdr index/type) : ,(unparse-term (cdr index/type) scope))
-      result)
-     (set-add scope (car index/type)))))
+     (append
+      result
+      `((,(car index.type) : ,(unparse-term (cdr index.type) scope))))
+     (set-add scope (car index.type)))))
 
 (define (unparse-term term [scope (seteqv)] [check-free? #t])
   (define (recurse t) (unparse-term t scope check-free?))
@@ -697,8 +703,9 @@
      #:when (and (self rator1 rator2 scope1 scope2)
                  (self rand1 rand2 scope1 scope2))
      #t]
-    [_ (debug-log (format "Not related:~n Term 1:~a~n Term 2:~a~n Scope1:~a~n Scope2:~a~n"
-                          t1 t2 scope1 scope2))
+    [_ (debug-log (format
+                   "Not related:~n Term 1:~a~n Term 2:~a~n Scope1:~a~n Scope2:~a~n"
+                   t1 t2 scope1 scope2))
        #f]))
 
 (define (elim-branches-*α term-*α? branches1 branches2 scope1 scope2)
