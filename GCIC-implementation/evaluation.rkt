@@ -4,12 +4,14 @@
                   supported-variants
                   Var Univ App Lam Pi IndT Constr IndElim Branch
                   Unk Err Cast
+                  Spine Spine?
                   ind-def
                   unparse-term
                   ~α
                   fresh-name subst subst-args
                   get-params debug-log trace-if-param))
 (require (only-in "eval-context.rkt"
+                  FLam FPi FConstrParam FConstrArg FIndT
                   FApp FIndElim FUnk FErr FCastSrc FCastTrg FCastTrm
                   unparse-evalctx))
 (provide (all-defined-out))
@@ -100,28 +102,38 @@
 ;; Preconditons: (ccic-term? term)
 (define (canonical-term? term)
   (match term
-    [(or (Lam _ _ _ _)
-         (Constr _ _ _ _ _)
-         (Pi _ _ _ _)
-         (Univ _)
-         (IndT _ _ _))
-     #t]
-    [(or (Unk t) (Err t))
-     (match t
-       [(or (Univ _)
-            (IndT _ _ _)
-            (Unk (Univ _))
-            (Err (Univ _)))
-        #t]
-       [_
-        (define-values (term-struct _) (struct-info t))
-        (define-values (term-name _1 _2 _3 _4 _5 _6 _7) (struct-type-info term-struct))
-        (debug-log (format "Invalid type associated with term ~a: ~a" term-name t))
-        #f])]
+    [(Lam _ _ A _) (canonical-term? A)]
+    [(Pi _ _ A _) (canonical-term? A)]
+    [(Constr _ _ _ params args)
+     (for/and ([t (append params args)])
+       (canonical-term? t))]
+    [(Univ _) #t]
+    [(IndT _ _ params)
+     (for/and ([param params])
+       (canonical-term? param))]
+    [(Spine neut) (neutral-term? neut)]
+    [(Unk t) (canon-unk-err-type? t)]
+    [(Err t) (canon-unk-err-type? t)]
     [(Cast term source (Unk (Univ level)))
-     #:when (germ? source level)
-     #t]
-    [_ (neutral-term? term)]))
+     (and (germ? source level) (canonical-term? term))]
+    [_
+     (debug-log (format "Not a canonical term: ~a" term))
+     #f]))
+
+;; Preconditons: (ccic-term? term)
+(define (canon-unk-err-type? term)
+  (match term
+    [(Univ _) #t]
+    [(IndT _ _ params)
+     (for/and ([param params])
+       (canonical-term? param))]
+    [(or (Unk (Univ _)) (Err (Univ _))) #t]
+    [_
+     (debug-log
+      (format
+       "Not a canonical type used with Unk or Err: ~a"
+       term))
+     #f]))
 
 ;; Preconditons: (ccic-term? term)
 (define (neutral-term? term)
@@ -130,22 +142,48 @@
     [(App rator _) (neutral-term? rator)]
     [(IndElim _ scrut _ _ _ _ _ _) (neutral-term? scrut)]
     [(or (Unk t) (Err t)) (neutral-term? t)]
-    [(Cast source target term)
+    [(Lam _ _ A _) (neutral-term? A)]
+    [(Pi _ _ A _) (neutral-term? A)]
+    [(Constr _ _ _ params args) (neutral-sequence? (append params args))]
+    [(IndT _ _ params) (neutral-sequence? params)]
+    [(Cast term source target)
      (match source
+       [_ #:when (neutral-term? source) #t]
        [(Unk (Univ _)) (neutral-term? term)]
        [(Univ _) (neutral-term? target)]
-       [(Pi _ _ _ _)
+       [(Pi _ _ A _)
+        #:when (canonical-term? A)
         (match target
           [(Pi _ _ _ _) (neutral-term? term)]
           [_ (neutral-term? target)])]
-       [(IndT _ _ _)
+       [(IndT _ _ paramsS)
+        #:when (for/and ([param paramsS])
+                 (canonical-term? param))
         (match target
-          [(IndT _ _ _) (neutral-term? term)]
+          [(IndT _ _ paramsT)
+           #:when (for/and ([param paramsT])
+                    (canonical-term? param))
+           (neutral-term? term)]
           [_ (neutral-term? target)])]
-       [_ (neutral-term? source)])]
+       [_
+        (debug-log
+         (format
+          "Invalid source type of a neutral cast: ~a"
+          source))
+        #f])]
     [_
      (debug-log (format "Not a neutral term: ~a" term))
      #f]))
+
+;; Preconditons: (and (list? ts)
+;;                    (for/and ([term ts])
+;;                      (ccic-term? term)))
+(define (neutral-sequence? ts)
+  (cond
+    [(null? ts) #t]
+    [(Spine? (car ts)) (neutral-sequence? (car ts))]
+    [(canonical-term? (car ts)) (neutral-sequence? (cdr ts))]
+    [else #f]))
 
 ; ∃ scope, defs . (and (ccic-term? term defs scope) (not (canonical-term? term))
 ;                      (ccic-term? (reduce-if-principal defs term) defs scope))
@@ -207,8 +245,8 @@
      A]
     [(Cast (Constr I c level as bs) (IndT I level as1) (IndT I level as2))
      (trace-eval "Applying principal reduction rule IND-IND")
-     ;; TODO: ensure adding casts according to the thesis as opposed to
-     ;; the paper is correct
+     ;; NOTE: Meven agrees that this way of implementing the IND-IND rule should
+     ;; be correct compared to the ambiguous way in which it is stated in the paper.
      (define bs^
        (for/list ([b bs]
                   [src (subst-args defs I level c as1 bs)]
@@ -249,6 +287,46 @@
      (trace-eval "Applying principal reduction rule PROD-GERM")
      (let ([G (germ (HeadPi) i defs)])
        (Cast (Cast t S G) G (Unk (Univ i))))]
+
+    ;; Spine expansion rules
+    [(Var x)
+     (trace-eval "Applying principal reduction rule SPINE-VAR")
+     (Spine (Var x))]
+    [(App (Spine neut) t)
+     (trace-eval "Applying principal reduction rule SPINE-APP")
+     (Spine (App neut t))]
+    [(IndElim I (Spine neut) z orig-z P f orig-f branches)
+     (trace-eval "Applying principal reduction rule SPINE-MATCH")
+     (Spine (IndElim I neut z orig-z P f orig-f branches))]
+    [(Unk (Spine neut))
+     (trace-eval "Applying principal reduction rule SPINE-UNK")
+     (Spine (Unk neut))]
+    [(Err (Spine neut))
+     (trace-eval "Applying principal reduction rule SPINE-ERR")
+     (Spine (Err neut))]
+    [(Lam x x-orig (Spine neut) body)
+     (trace-eval "Applying principal reduction rule SPINE-LAM")
+     (Spine (Lam x x-orig neut body))]
+    [(Pi x x-orig (Spine neut) body)
+     (trace-eval "Applying principal reduction rule SPINE-PI")
+     (Spine (Pi x x-orig neut body))]
+    [(Constr ind-name constr-name level params args)
+     #:when (findf Spine? (append params args))
+     (trace-eval "Applying principal reduction rule SPINE-CONSTR")
+     (Spine (Constr ind-name constr-name level params args))]
+    [(IndT name level params)
+     #:when (findf Spine? params )
+     (trace-eval "Applying principal reduction rule SPINE-IND")
+     (Spine (IndT name level params))]
+    [(Cast t (Spine neut) target)
+     (trace-eval "Applying principal reduction rule SPINE-CAST-SRC")
+     (Spine (Cast t neut target))]
+    [(Cast t source (Spine neut))
+     (trace-eval "Applying principal reduction rule SPINE-CAST-TGT")
+     (Spine (Cast t source neut))]
+    [(Cast (Spine neut) source target)
+     (trace-eval "Applying principal reduction rule SPINE-CAST-TRM")
+     (Spine (Cast neut source target))]
 
     [_
      (trace-eval "Cannot apply any principal reduction rule")
@@ -333,7 +411,15 @@
   (trace-eval "Term:~a~n" (pretty-format (unparse-term t (seteqv) #f)))
   (trace-eval "Context:~a~n" (pretty-format (unparse-evalctx evalctx)))
   (match t
-    [v #:when (canonical-term? v) (refocus-aux evalctx v defs)]
+    [v
+     ;; TODO: canonical-term? checks whether the term in a Spine node is a
+     ;; neutral-term?. Since a Spine node is only constructed during evaluation,
+     ;; the term inside this node will satisfy neutral-term? by construction.
+     ;; Therefore, we should try using a version of canonical-term? which
+     ;; returns #t for a Spine node without checking whether the term inside the
+     ;; Spine satisfies neutral-term? which would save some time.
+     #:when (canonical-term? v)
+     (refocus-aux evalctx v defs)]
 
     ;; cases corresponding to neutral-term? cases
     [(Var x) (iterate `(,evalctx . ,t) defs)]
@@ -348,6 +434,30 @@
      (refocus T (cons (FUnk) evalctx) defs)]
     [(Err T)
      (refocus T (cons (FErr) evalctx) defs)]
+    [(Lam x x-orig T body)
+     (refocus T (cons (FLam x x-orig body) evalctx) defs)]
+    [(Pi x x-orig T body)
+     (refocus T (cons (FPi x x-orig body) evalctx) defs)]
+    [(Constr ind-name constr-name level
+             (cons first-param rest-params) args)
+     (refocus first-param
+              (cons
+               (FConstrParam ind-name constr-name level
+                             '() rest-params args)
+               evalctx)
+              defs)]
+    [(Constr ind-name constr-name level '()
+             (cons first-arg rest-args))
+     (refocus first-arg
+              (cons
+               (FConstrArg ind-name constr-name level
+                           '() '() rest-args)
+               evalctx)
+              defs)]
+    [(IndT name level (cons first-param rest-params))
+     (refocus first-param
+              (cons (FIndT name level '() rest-params) evalctx)
+              defs)]
     [(Cast term source target)
      (refocus source (cons (FCastSrc term target) evalctx) defs)]
 
@@ -371,54 +481,130 @@
      ;; evaluation done
      (iterate v defs)]
 
-    ;; Plug v into the top frame of evalctx and choose to either 1) evaluate the
-    ;; plugged term as a potential principal redex using iterate or 2) evaluate
-    ;; subterms of the plugged term using refocus which can later be potential
-    ;; principal redexes 3) Evaluate the surrounding context using refocus-aux
-    ;; if the plugged term is not a potential redex but is a value.
+    ;; Plug v into the top frame of evalctx and choose to either:
+    ;;
+    ;; 1) Evaluate the plugged term as a potential principal redex using iterate
+    ;;
+    ;; 2) Evaluate subterms of the plugged term using refocus which can later be
+    ;; potential principal redexes
+    ;;
+    ;; 3) Evaluate the surrounding context using refocus-aux if the plugged term
+    ;; is not a potential redex but is a value.
     [((cons (FApp rand) evalctx) _)
-     ;; try PROD-BETA
+     ;; case 1, try PROD-BETA
      (iterate `(,evalctx . ,(App v rand)) defs)]
     [((cons (FIndElim ind-name z orig-z P f orig-f branches) evalctx) v)
-     ;; try IND-BETA
+     ;; case 1, try IND-BETA
      (iterate `(,evalctx . ,(IndElim ind-name v z orig-z P f orig-f branches))
               defs)]
 
     [((cons (FUnk) evalctx) (Pi _ _ _ _))
-     ;; try PROD-UNK
+     ;; case 1, try PROD-UNK
      (iterate `(,evalctx . ,(Unk v)) defs)]
     [((cons (FErr) evalctx) (Pi _ _ _ _))
-     ;; try PROD-ERR
+     ;; case 1, try PROD-ERR
      (iterate `(,evalctx . ,(Err v)) defs)]
     [((cons (FUnk) evalctx) _)
-     ;; Not a potential principal redex, but plugging results in a value. So we
-     ;; evaluate the plugged term by casing on the surrounding context using
-     ;; refocus-aux.
+     ;; case 3
      (refocus-aux evalctx (Unk v) defs)]
     [((cons (FErr) evalctx) _)
-     ;; Not a potential principal redex, but plugging results in a value. So we
-     ;; evaluate the plugged term by casing on the surrounding context using
-     ;; refocus-aux.
+     ;; case 3
      (refocus-aux evalctx (Err v) defs)]
 
+    [((cons (FLam x x-orig body) evalctx) _)
+     ;; case 3
+     (refocus-aux evalctx (Lam x x-orig v body) defs)]
+    [((cons (FPi x x-orig body) evalctx) _)
+     ;; case 3
+     (refocus-aux evalctx (Pi x x-orig v body) defs)]
+    [((cons
+       (FConstrParam ind-name constr-name level rev-pre-params
+                     (cons next-param later-params) args)
+       evalctx)
+      _)
+     ;; case 2
+     (refocus next-param
+              (cons
+               (FConstrParam ind-name constr-name level
+                             (cons v rev-pre-params)
+                             later-params args)
+               evalctx))]
+    [((cons
+       (FConstrParam ind-name constr-name level rev-params '()
+                     (cons first-arg rest-args))
+       evalctx)
+      _)
+     ;; case 2
+     (refocus first-arg
+              (cons
+               (FConstrArg ind-name constr-name level
+                           (reverse (cons v rev-params))
+                           '() rest-args)
+               evalctx))]
+    [((cons
+       (FConstrParam ind-name constr-name level rev-params '() '())
+       evalctx)
+      _)
+     ;; case 3
+     (refocus-aux evalctx
+                  (Constr ind-name constr-name level
+                          (reverse (cons v rev-params)) '())
+                  defs)]
+    [((cons
+       (FConstrArg ind-name constr-name level params
+                   rev-pre-args (cons next-arg later-args))
+       evalctx)
+      _)
+     ;; case 2
+     (refocus next-arg
+              (cons
+               (FConstrArg ind-name constr-name level params
+                           (cons v rev-pre-args) later-args)
+               evalctx))]
+    [((cons
+       (FConstrArg ind-name constr-name level params rev-args '())
+       evalctx)
+      _)
+     ;; case 3
+     (refocus-aux evalctx
+                  (Constr ind-name constr-name level params
+                          (reverse (cons v rev-args)))
+                  defs)]
+    [((cons
+       (FIndT name level rev-pre-args (cons next-arg later-args))
+       evalctx)
+      _)
+     ;; case 2
+     (refocus next-arg
+              (cons
+               (FIndT name level
+                      (cons v rev-pre-args)
+                      later-args)
+               evalctx))]
+    [((cons (FIndT name level rev-args '()) evalctx) _)
+     ;; case 3
+     (refocus-aux evalctx
+                  (IndT name level
+                        (reverse (cons v rev-args)))
+                  defs)]
+
     [((cons (FCastSrc term target) evalctx) (Unk (Univ i)))
-     ;; Not a potential principal redex. Refocus to evaluating the term being
-     ;; cast as hinted by the neutral-term? case.
+     ;; case 2
      (refocus term (cons (FCastTrm v target) evalctx) defs)]
     [((cons (FCastSrc term target) evalctx) (or (Univ _) (Pi _ _ _ _) (IndT _ _ _)))
-     ;; Not a potential principal redex. Refocus to evaluating target as
-     ;; hinted by neutral-term? cases.
+     ;; case 2
      (refocus target (cons (FCastTrg term v) evalctx) defs)]
     [((cons (FCastSrc term target) evalctx) v)
-     ;; TODO: probably don't need this case
+     ;; case 1
      (iterate `(,evalctx . ,(Cast term v target)) defs)]
     [((cons (FCastTrg term source) evalctx) (or (Pi _ _ _ _) (IndT _ _ _)))
-     ;; Not a potential principal redex. Refocus to evaluating term as hinted by
-     ;; neutral-term? cases.
+     ;; case 2
      (refocus term (cons (FCastTrm source v) evalctx) defs)]
     [((cons (FCastTrg term source) evalctx) v)
+     ;; case 1
      (iterate `(,evalctx . ,(Cast term source v)) defs)]
     [((cons (FCastTrm source target) evalctx) v)
+     ;; case 1
      (iterate `(,evalctx . ,(Cast v source target)) defs)]
 
     [(_ _) (error 'refocus-aux "Unexpected context:~n~a~nValue:~a~n"

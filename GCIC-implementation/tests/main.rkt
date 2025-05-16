@@ -45,6 +45,6 @@
 
 (check-exn #rx"^check:" (λ () (run bad-prog-list-append #:force? #t)))
 
-(check-program prog-vec-12
-               (encode-vec-nat '(1 2))
+(check-program prog-vec-f-12
+               (encode-vec-f-nat '(1 2))
                defs)

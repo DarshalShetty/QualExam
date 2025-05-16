@@ -261,6 +261,7 @@
        [else `(,name ,level . ,(map recurse params))])
      ]
     [(App rator rand) `(,(recurse rator) ,(recurse rand))]
+    [(Spine neut) `(∥ ,(recurse neut) ∥)]
     [_ (error 'unparse-term "Invalid term: ~a" term)]))
 
 (define (unparse-elim-branches branches scope [check-free? #t])
@@ -703,6 +704,9 @@
      #:when (and (self rator1 rator2 scope1 scope2)
                  (self rand1 rand2 scope1 scope2))
      #t]
+    [`(,(Spine neut1) ,(Spine neut2))
+     #:when (self neut1 neut2 scope1 scope2)
+     #t]
     [_ (debug-log (format
                    "Not related:~n Term 1:~a~n Term 2:~a~n Scope1:~a~n Scope2:~a~n"
                    t1 t2 scope1 scope2))
@@ -778,7 +782,9 @@
        [(Unk type)
         (Unk (recurse type))]
        [(Err type)
-        (Err (recurse type))])]))
+        (Err (recurse type))]
+       [(Spine neut)
+        (Spine (recurse neut))])]))
 
 (define (subst-elim-branches terms for-symbols in-branches)
   (for/list ([b in-branches])
