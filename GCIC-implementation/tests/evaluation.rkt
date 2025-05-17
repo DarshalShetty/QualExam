@@ -59,35 +59,18 @@
 (let* ([defs (parse-defs `(,ind-def-nat))]
        [add (parse-term fun-add defs)]
        [two (parse-term term-two defs)]
-       [suc1+2 (evaluate (App (App add two) two) defs)]
-       [suc0+2 (evaluate (car (Constr-args suc1+2)) defs)])
+       [suc2+2 (evaluate (App (App add two) two) defs)]
+       [suc1+2 (evaluate (car (Constr-args suc2+2)) defs)])
+  (check-true (=α suc2+2
+                  (parse-term
+                   (encode-nat 4)
+                   defs)))
   (check-true (=α suc1+2
                   (parse-term
-                   '(@ Nat succ &
-                     ((λ (x : (Nat))
-                        (elim Nat x as (λ (_) (Nat)) rec succ-app with
-                         ((zero) => (@ Nat succ & (@ Nat succ & (@ Nat zero &))))
-                         ((succ n) => (@ Nat succ & (succ-app n)))))
-                      (@ Nat succ & (@ Nat zero &))))
+                   (encode-nat 3)
                    defs)))
-  (check-true (=α suc0+2
-                  (parse-term
-                   '(@ Nat succ &
-                     ((λ (x : (Nat))
-                        (elim Nat x as (λ (_) (Nat)) rec succ-app with
-                         ((zero) => (@ Nat succ & (@ Nat succ & (@ Nat zero &))))
-                         ((succ n) => (@ Nat succ & (succ-app n)))))
-                      (@ Nat zero &)))
-                   defs)))
-  (check-true (=α (evaluate (car (Constr-args suc0+2)) defs)
+  (check-true (=α (evaluate (car (Constr-args suc1+2)) defs)
                   two)))
-
-;; even less painful 2+2=4
-(let* ([defs (parse-defs `(,ind-def-nat))]
-       [add (parse-term fun-add defs)]
-       [two (parse-term term-two defs)])
-  (check-true (=α (evaluate-subterms (App (App add two) two) defs)
-                  (parse-term (encode-nat 4) defs))))
 
 (define (ccic-Ω level)
   (let* ([elab-unk (Cast (Unk (Unk (Univ (add1 level))))
@@ -110,3 +93,13 @@
 
 (parameterize ([current-variant 'gcic-shift])
   (check-equal? (evaluate (ccic-Ω 1) '()) (Err (Unk (Univ 0)))))
+
+(check-true
+ (=α
+  (evaluate (parse-term
+             '((λ (x : (Π (_ : (□ 1)) (□ 0))) (x ((λ (y : (□ 1)) y) (□ 0))))
+               z)
+             '()
+             (seteqv 'z))
+            '())
+  (Spine (App (Var 'z) (App (Lam 'y 'y (Univ 1) (Var 'y)) (Univ 0))))))
