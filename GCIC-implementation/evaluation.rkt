@@ -139,38 +139,35 @@
 (define (neutral-term? term)
   (match term
     [(Var _) #t]
-    [(App rator _) (neutral-term? rator)]
-    [(IndElim _ scrut _ _ _ _ _ _) (neutral-term? scrut)]
-    [(or (Unk t) (Err t)) (neutral-term? t)]
-    [(Lam _ _ A _) (neutral-term? A)]
-    [(Pi _ _ A _) (neutral-term? A)]
+    [(App (Spine rator) _) (neutral-term? rator)]
+    [(IndElim _ (Spine scrut) _ _ _ _ _ _) (neutral-term? scrut)]
+    [(or (Unk (Spine t)) (Err (Spine t))) (neutral-term? t)]
+    [(Lam _ _ (Spine A) _) (neutral-term? A)]
+    [(Pi _ _ (Spine A) _) (neutral-term? A)]
     [(Constr _ _ _ params args) (neutral-sequence? (append params args))]
     [(IndT _ _ params) (neutral-sequence? params)]
-    [(Cast term source target)
-     (match source
-       [_ #:when (neutral-term? source) #t]
-       [(Unk (Univ _)) (neutral-term? term)]
-       [(Univ _) (neutral-term? target)]
-       [(Pi _ _ A _)
-        #:when (canonical-term? A)
-        (match target
-          [(Pi _ _ _ _) (neutral-term? term)]
-          [_ (neutral-term? target)])]
-       [(IndT _ _ paramsS)
-        #:when (for/and ([param paramsS])
-                 (canonical-term? param))
-        (match target
-          [(IndT _ _ paramsT)
-           #:when (for/and ([param paramsT])
-                    (canonical-term? param))
-           (neutral-term? term)]
-          [_ (neutral-term? target)])]
-       [_
-        (debug-log
-         (format
-          "Invalid source type of a neutral cast: ~a"
-          source))
-        #f])]
+    [(Cast _ (Spine source) _)
+     (neutral-term? source)]
+    [(Cast (Spine term) (Unk (Univ _)) _)
+     (neutral-term? term)]
+    [(Cast _ (Univ _) (Spine target))
+     (neutral-term? target)]
+    [(Cast _ (Pi _ _ A _) (Spine target))
+     #:when (canonical-term? A)
+     (neutral-term? target)]
+    [(Cast (Spine term) (Pi _ _ A-src _) (Pi _ _ A-tgt _))
+     #:when (and (canonical-term? A-src) (canonical-term? A-tgt))
+     (neutral-term? term)]
+    [(Cast _ (IndT _ _ params-src) (Spine target))
+     #:when (for/and ([param params-src])
+              (canonical-term? param))
+     (neutral-term? target)]
+    [(Cast (Spine term) (IndT _ _ params-src) (IndT _ _ params-tgt))
+     #:when (and (for/and ([param params-tgt])
+                   (canonical-term? param))
+                 (for/and ([param params-src])
+                   (canonical-term? param)))
+     (neutral-term? term)]
     [_
      (debug-log (format "Not a neutral term: ~a" term))
      #f]))
@@ -294,22 +291,22 @@
      (Spine (Var x))]
     [(App (Spine neut) t)
      (trace-eval "Applying principal reduction rule SPINE-APP")
-     (Spine (App neut t))]
+     (Spine (App (Spine neut) t))]
     [(IndElim I (Spine neut) z orig-z P f orig-f branches)
      (trace-eval "Applying principal reduction rule SPINE-MATCH")
-     (Spine (IndElim I neut z orig-z P f orig-f branches))]
+     (Spine (IndElim I (Spine neut) z orig-z P f orig-f branches))]
     [(Unk (Spine neut))
      (trace-eval "Applying principal reduction rule SPINE-UNK")
-     (Spine (Unk neut))]
+     (Spine (Unk (Spine neut)))]
     [(Err (Spine neut))
      (trace-eval "Applying principal reduction rule SPINE-ERR")
-     (Spine (Err neut))]
+     (Spine (Err (Spine neut)))]
     [(Lam x x-orig (Spine neut) body)
      (trace-eval "Applying principal reduction rule SPINE-LAM")
-     (Spine (Lam x x-orig neut body))]
+     (Spine (Lam x x-orig (Spine neut) body))]
     [(Pi x x-orig (Spine neut) body)
      (trace-eval "Applying principal reduction rule SPINE-PI")
-     (Spine (Pi x x-orig neut body))]
+     (Spine (Pi x x-orig (Spine neut) body))]
     [(Constr ind-name constr-name level params args)
      #:when (findf Spine? (append params args))
      (trace-eval "Applying principal reduction rule SPINE-CONSTR")
@@ -320,13 +317,13 @@
      (Spine (IndT name level params))]
     [(Cast t (Spine neut) target)
      (trace-eval "Applying principal reduction rule SPINE-CAST-SRC")
-     (Spine (Cast t neut target))]
+     (Spine (Cast t (Spine neut) target))]
     [(Cast t source (Spine neut))
      (trace-eval "Applying principal reduction rule SPINE-CAST-TGT")
-     (Spine (Cast t source neut))]
+     (Spine (Cast t source (Spine neut)))]
     [(Cast (Spine neut) source target)
      (trace-eval "Applying principal reduction rule SPINE-CAST-TRM")
-     (Spine (Cast neut source target))]
+     (Spine (Cast (Spine neut) source target))]
 
     [_
      (trace-eval "Cannot apply any principal reduction rule")
@@ -615,11 +612,158 @@
 (define trace-eval
   (trace-if-param trace-eval?))
 
+; precondition: (and (*cic-defs? ccic-term? defs)
+;                    (ccic-term? term defs))
+(define (normalize term defs)
+  (match (evaluate term defs)
+    [(cons evalctx potential-redex)
+     (error 'normalize
+            (string-append
+             "The term to be evaluated got stuck.~n"
+             "Term:~n~a~n"
+             "Stuck Redex:~n~a~n"
+             "Stuck Evaluation Contxt:~n~a~n")
+            term potential-redex evalctx)]
+    [v (readback v defs)]))
+
+; precondition: (and (*cic-defs? ccic-term? defs)
+;                    (canonical-term? canon defs))
+(define (readback canon defs)
+  (match canon
+    [(Lam x x-orig canon-T body)
+     (define y (gensym x-orig))
+     #;
+     (Lam y x-orig canon-T
+          (normalize (App (Lam x x-orig canon-T body) (Spine (Var y))) defs))
+     ;; TODO: test if this unsafe optimization is equivalent to the proper way
+     ;; to do it as commented above. The same optimization is done in the Pi
+     ;; case and the IndElim case in the unwind function. Once a counterexample
+     ;; is found, need to implement the proper way.
+     (Lam x x-orig canon-T (normalize body defs))]
+    [(Pi x x-orig canon-T body)
+     (define y (gensym x-orig))
+     #;
+     (Pi y x-orig canon-T
+         (normalize (App (Pi x x-orig canon-T body) (Spine (Var y))) defs))
+     (Pi x x-orig canon-T (normalize body defs))]
+    [(Constr ind-name constr-name level canon-params canon-args)
+     (Constr ind-name constr-name level
+             (for/list ([param canon-params])
+               (readback param defs))
+             (for/list ([arg canon-args])
+               (readback arg defs)))]
+    [(Univ level) (Univ level)]
+    [(IndT name level canon-params)
+     (IndT name level
+           (for/list ([param canon-params])
+             (readback param defs)))]
+    [(Unk canon-T) (Unk (readback canon-T defs))]
+    [(Err canon-T) (Err (readback canon-T defs))]
+    [(Cast t germ-src (Unk (Univ level)))
+     (Cast (normalize t defs) germ-src (Unk (Univ level)))]
+    [(Spine neut)
+     (unwind neut defs)]
+    [t (error 'readback "Input is not a canonical term: ~a~n" t)]))
+
+; precondition: (and (*cic-defs? ccic-term? defs)
+;                    (neutral-term? neut defs))
+(define (unwind neut defs)
+  (match neut
+    [(Var x) (Var x)]
+    [(App (Spine neut-rator) rand)
+     (App (unwind neut-rator defs) (normalize rand defs))]
+    [(IndElim ind-name (Spine neut-scrut) z z-orig P f f-orig branches)
+     (IndElim ind-name (unwind neut-scrut defs) z z-orig P f f-orig
+              (for/list ([branch branches])
+                (match-define (Branch constr-name arg-names orig-arg-names body)
+                  branch)
+                (Branch constr-name arg-names orig-arg-names
+                        (normalize body defs))))]
+    [(Unk (Spine neut-type)) (Unk (unwind neut-type defs))]
+    [(Err (Spine neut-type)) (Err (unwind neut-type defs))]
+    [(Lam x x-orig (Spine neut-T) body)
+     (Lam x x-orig (unwind neut-T defs)
+          (normalize body defs))]
+    [(Pi x x-orig (Spine neut-T) body)
+     (Pi x x-orig (unwind neut-T defs)
+         (normalize body defs))]
+    [(Constr ind-name constr-name level params args)
+     (define-values (params^ all-canon?)
+       (unwind-maybe-neutral-sequence params defs))
+     (cond
+       [all-canon?
+        ;; neutral term is in args
+        (define-values (args^ _)
+          (unwind-maybe-neutral-sequence args defs))
+        (Constr ind-name constr-name level params^ args^)]
+       [else
+        ;; neutral term is in params
+        (Constr ind-name constr-name level params^
+                (for/list ([arg args])
+                  (normalize arg defs)))])]
+    [(IndT name level params)
+     (define-values (params^ _)
+       (unwind-maybe-neutral-sequence params defs))
+     (IndT name level params^)]
+    [(Cast term (Spine source) target)
+     (Cast (normalize term defs)
+           (unwind source defs)
+           (normalize target defs))]
+    [(Cast (Spine term) (Unk (Univ level)) target)
+     (Cast (unwind term defs)
+           (Unk (Univ level))
+           (normalize target defs))]
+    [(Cast term (Univ level) (Spine target))
+     (Cast (normalize term defs)
+           (Univ level)
+           (unwind target defs))]
+    [(Cast term (Pi x x-orig A B) (Spine target))
+     (Cast (normalize term defs)
+           (readback (Pi x x-orig A B) defs)
+           (unwind target defs))]
+    [(Cast (Spine term)
+           (Pi x-src x-orig-src A-src B-src)
+           (Pi x-trg x-orig-trg A-trg B-trg))
+     (Cast (unwind term defs)
+           (readback (Pi x-src x-orig-src A-src B-src) defs)
+           (readback (Pi x-trg x-orig-trg A-trg B-trg) defs))]
+    [(Cast term (IndT name level params) (Spine target))
+     (Cast (normalize term defs)
+           (readback (IndT name level params) defs)
+           (unwind target defs))]
+    [(Cast (Spine term)
+           (IndT name-src level-src params-src)
+           (IndT name-trg level-trg params-trg))
+     (Cast (unwind term defs)
+           (readback (IndT name-src level-src params-src) defs)
+           (readback (IndT name-trg level-trg params-trg) defs))]
+
+    [n (error 'unwind "Input is not a neutral term: ~a~n" n)]))
+
+; precondition: (and (*cic-defs? ccic-term? defs)
+;                    (list? terms)
+;                    (or (for/and ([t terms])
+;                          (canonical-term? t))
+;                        (neutral-sequence? terms)))
+(define (unwind-maybe-neutral-sequence terms defs)
+  (match terms
+    ['() (values '() #t)]
+    [`(,(Spine neut) . ,rest-terms)
+     (values (cons (unwind neut defs)
+                   (for/list ([t rest-terms])
+                     (normalize t defs)))
+             #f)]
+    [`(,canon . ,rest-terms)
+     (define-values (rest-terms^ all-canon?)
+       (unwind-maybe-neutral-sequence rest-terms defs))
+     (values (cons (readback canon defs)
+                   rest-terms^)
+             all-canon?)]))
+
 (define (~ t1 t2 defs [scope '()])
   (debug-log (format "Checking consistent conversion between ~a and ~a" t1 t2))
-  ;; TODO: replace evaluate by normalize
-  (define canon-t1 (evaluate t1 defs))
-  (define canon-t2 (evaluate t2 defs))
+  (define canon-t1 (normalize t1 defs))
+  (define canon-t2 (normalize t2 defs))
   (debug-log (format (string-append
                       "Consistent conversion check will proceed to check"
                       " α-consistency between canonical terms ~a and ~a")

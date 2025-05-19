@@ -102,4 +102,20 @@
              '()
              (seteqv 'z))
             '())
-  (Spine (App (Var 'z) (App (Lam 'y 'y (Univ 1) (Var 'y)) (Univ 0))))))
+  (Spine (App (Spine (Var 'z)) (App (Lam 'y 'y (Univ 1) (Var 'y)) (Univ 0))))))
+
+(check-true
+ (=α
+  (readback (Spine (App (Spine (Var 'z)) (App (Lam 'y 'y (Univ 1) (Var 'y)) (Univ 0))))
+            '())
+  (parse-term '(z (□ 0)) '() (seteqv 'z))))
+
+(check-true
+ (=α
+  (normalize (parse-term
+              '((λ (x : (Π (_ : (□ 1)) (□ 0))) (x ((λ (y : (□ 1)) y) (□ 0))))
+                z)
+              '()
+              (seteqv 'z))
+             '())
+  (parse-term '(z (□ 0)) '() (seteqv 'z))))
