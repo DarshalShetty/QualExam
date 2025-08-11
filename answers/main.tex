@@ -1,14 +1,49 @@
 \documentclass{article}
+\usepackage[head=13pt,%
+paperwidth=8.5in, paperheight=11in,
+includeheadfoot=false,
+% top=1in, bottom=1in, inner=0.75in, outer=0.75in,
+% marginparwidth=2pc,
+heightrounded
+]{geometry}
 
 \usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{amsthm}
 \usepackage[dvipsnames]{xcolor}
 \usepackage{bbm}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{ebproof}
+\usepackage{stmaryrd}
+\usepackage[square,numbers]{natbib}
+\usepackage{titlesec}
+
+\titleformat{\section}
+{\normalfont\Large\bfseries}{Question~\thesection}{1em}{}
+
+\lstdefinelanguage{GCIC}{
+  basicstyle=\color{OliveGreen}\ttfamily,
+  breaklines=true,
+  breakatwhitespace=true,
+}
+\lstdefinelanguage{CCIC}{
+  basicstyle=\color{BlueViolet}\ttfamily,
+  breaklines=true,
+  breakatwhitespace=true,
+}
 
 \newtheorem{theorem}{Theorem}
+\theoremstyle{definition}
+\newtheorem{example}[theorem]{Example}
 
 \newcommand{\Scode}[1]{{\fontfamily{cmss}\selectfont\color{Mahogany}#1}}
 \newcommand{\Gcode}[1]{{\color{OliveGreen}\textit{#1}}}
 \newcommand{\Ccode}[1]{{\color{BlueViolet}\textbf{#1}}}
+\newcommand{\Scmath}[1]{{\color{Mahogany}#1}}
+\newcommand{\Gcmath}[1]{{\color{OliveGreen}#1}}
+\newcommand{\Ccmath}[1]{{\color{BlueViolet}\boldsymbol{#1}}}
+\newcommand{\Gcsub}[2]{\Gcode{#1}\(\Gcmath{_{#2}}\)}
 \newcommand{\GCICN}[0]{GCIC\(^\mathcal{N}\)}
 \newcommand{\GCICG}[0]{GCIC\(^\mathcal{G}\)}
 \newcommand{\GCICS}[0]{GCIC\(^\uparrow\)}
@@ -16,8 +51,19 @@
 \newcommand{\CCICG}[0]{CastCIC\(^\mathcal{G}\)}
 \newcommand{\CCICS}[0]{CastCIC\(^\uparrow\)}
 \newcommand{\GGEq}[0]{\(\triangleright\)GEq}
+\newcommand{\ElabSynth}[4]{
+  #1~\(\vdash\)~#2~\(\rightsquigarrow\)~#3~\(\triangleright\)~#4}
+\newcommand{\ElabCheck}[4]{#1~\(\vdash\)~#2~\(\triangleleft\)~#3~\(\rightsquigarrow\)~#4}
+\newcommand{\ElabConstrSynth}[5]{
+  #1~\(\vdash\)~#2~\(\rightsquigarrow\)~#3~\(\blacktriangleright_{#4}\)~#5}
+\newcommand{\Cast}[3]{
+  \(\Ccmath{\langle}\)#1~\(\Ccmath{\Leftarrow}\)~#2\(\Ccmath{\rangle}\)~#3}
+\newcommand{\CastTwo}[4]{
+  \(\Ccmath{\langle}\)#1~\(\Ccmath{\Leftarrow}\)~#2~\(\Ccmath{\Leftarrow}\)~#3\(\Ccmath{\rangle}\)~#4}
+\newcommand{\Rfa}[0]{\textit{refocus}_\textit{aux}}
+\newcommand{\Spine}[1]{\Ccmath{\llparenthesis#1\rrparenthesis}}
 
-\title{Qualifying Exam: On the Feasibility of a Gradual Dependently Typed
+\title{Qualifying Exam: Towards Implementing a Gradual Dependently Typed
   Language for Programming}
 
 \author{Darshal Shetty}
@@ -27,10 +73,6 @@
 \begin{document}
 
 \maketitle
-
-This document has three sections. Each section answers the questions asked in
-this qualifying examination. The first subsection of every section restates the
-question which it answers.
 
 \section{Literature Review}%
 \label{sec:question1}
@@ -63,41 +105,42 @@ the following papers:
 
 Siek and Taha\cite{siek_gradual_2006} introduced the notion of gradual typing
 which allows mixing of static and dynamic typing using a principled approach.
-They introduced a new type \verb|?| which is inhabited by any term similar to
-the \verb|Any| type in dynamically-typed or uni-typed languages. Unlike
+They introduced a new type \verb|?| which any term can inhabit similar to the
+\verb|Any| type in dynamically-typed or uni-typed languages. Unlike
 dynamically-typed languages, the programmer has control over which portions of
-the program gets checked at run-time and which ones get checked at compile-time
-by mixing \verb|?| into the type syntax. In order to make sure that type
-constraints for sub-terms annotated with fully static types (i.e., types without
-\verb|?| in them) occurring within terms of type \verb|?| hold true, the source
-language gets elaborated into a language with casts. The casts ensure that the
-necessary checks are performed on values moving across the static-dynamic
-boundary at run time.
+the program gets type-checked at run-time and which ones get checked at
+compile-time by inserting \verb|?| into the type annotations. When the
+type-checker checks the program, it elaborates the surface program written by a
+programmer into a cast calculus by inserting casts. The casts ensure that the
+run time performs necessary checks on values moving across the static-dynamic
+boundary.
 
-Siek et al.\cite{siek_refined_2015} noticed that the description of gradual
-types in \cite{siek_gradual_2006} was not formalized rigorously which later
-resulted in the creation of gradually typed systems which contain some
-undesirable properties. Thus, they came up with the precision relation
-\(\sqsubseteq\) which related types that were syntactically similar, except that
-some sub-terms in one type were replaced by \verb|?|. We say that a type
+\citet{siek_refined_2015} noticed that the description of gradual types in
+\citet{siek_gradual_2006} was not formalized rigorously which later resulted in
+the creation of gradually typed systems which contain some undesirable
+properties. Thus, they came up with the precision relation \(\sqsubseteq\) which
+related types that are syntactically similar, except that some sub-terms in one
+type correspond to the \verb|?| type in the other type. We say that a type
 \verb|T|\(_1\) is more precise than another type \verb|T|\(_2\), i.e.
 \verb|T|\(_1 \sqsubseteq\) \verb|T|\(_2\), when \verb|T|\(_2\) has more \verb|?|
 in its syntax than \verb|T|\(_1\). For example, we can compare the precision of
 two function types as \verb|T -> (T -> T)| \(\sqsubseteq\) \verb|T -> ?| where
-\verb|T| could be any type. The definition of precision on types is extended to
-terms to say that \verb|t|\(_1 \sqsubseteq\) \verb|t|\(_2\) for terms
-\verb|t|\(_1\), \verb|t|\(_2\) iff they differ only in type annotations and for
-each type annotation \verb|T|\(_1\) in \verb|t|\(_1\), \verb|T|\(_1
-\sqsubseteq\) \verb|T|\(_2\), where \verb|T|\(_2\) is the corresponding type in
-\verb|t|\(_2\) . Using this precision relation, Siek et al. define the static
-and dynamic \textit{gradual guarantees}.
+\verb|T| could be any type. The notion of precision on types extends to terms as
+well. We say that a term \verb|t|\(_1\) is more precise than a term
+\verb|t|\(_2\), i.e. \verb|t|\(_1 \sqsubseteq\) \verb|t|\(_2\), if and only if
+they differ only in type annotations and for each type annotation \verb|T|\(_1\)
+in \verb|t|\(_1\), \verb|T|\(_1 \sqsubseteq\) \verb|T|\(_2\), where
+\verb|T|\(_2\) is the corresponding type annotation in \verb|t|\(_2\) . Using
+this precision relation, \citet{siek_refined_2015} define the static and dynamic
+\textit{gradual guarantees}.
 
-We will now state the gradual guarantees using the precision relation
-\(\sqsubseteq\) and the judgment \verb|e|\(:\)\verb|T| which states that a
-closed term \verb|e| has type \verb|T|. The judgment
-\verb|e|\(\Downarrow\)\verb|v| expresses that a term \verb|e| evaluates to a
-value \verb|v| and \verb|e|\(\Uparrow\) means that \verb|e| diverges during
-evaluation.
+With the precision relation \(\sqsubseteq\), \citet{siek_refined_2015} stated
+the \textit{gradual guarantees} which were desirable for gradually typed
+languages to fulfill. The gradual guarantees use the judgment
+\verb|e|\(:\)\verb|T| which states that a closed term \verb|e| has type \verb|T|
+and the judgment \verb|e|\(\Downarrow\)\verb|v| expresses that a term \verb|e|
+evaluates to a value \verb|v| and \verb|e|\(\Uparrow\) means that \verb|e|
+diverges during evaluation.
 
 \textbf{Gradual guarantees: } Suppose \verb|e|\(\sqsubseteq\)\verb|e'| and
 \verb|e|\(:\)\verb|T|.
@@ -118,11 +161,10 @@ evaluation.
  \textit{monotone with respect to the precision relation}. This means that
  losing precision should not lead to static or dynamic errors.
 
-Siek and Taha \cite{siek_gradual_2006} gradualize the simply typed lambda
-calculus (STLC) by adding \verb|?| to the type syntax. Later works show how we
-can gradualize other statically-typed systems such as ownership
-types\cite{sergey_gradual_2012}, refinement types\cite{lehmann_gradual_2017},
-security
+\citet{siek_gradual_2006} gradualize the simply typed lambda calculus (STLC) by
+adding \verb|?| to the type syntax. Later works show how we can gradualize other
+statically-typed systems such as ownership types\cite{sergey_gradual_2012},
+refinement types\cite{lehmann_gradual_2017}, security
 types\cite{fennell_gradual_2013}\cite{toro_type-driven_2018}\cite{chen_quest_2024}
 and session types\cite{igarashi_gradual_2017}. Here, we will discuss the
 gradualization of full-spectrum dependent types based on type theories like
@@ -130,12 +172,13 @@ Martin-L\"of’s dependent type theory\cite{martin-lof_intuitionistic_1984} and
 calculus of constructions\cite{coquand_calculus_1988}.
 
 By the propositions as types interpretation of dependent types, gradualization
-allows us to partially state propositions by sprinkling \verb|?| in the type.
-Gradualization of dependent types also allow the run-time casts to check for
-more expressive type constraints corresponding to the rich types provided in
-this system. This should make programming using dependent types more accessible
-since programmers can have a running program even when the correctness of
-programs is partially specified and verified.
+allows us to partially state propositions by inserting \verb|?| in the type. The
+gradual type system then generates casts which ensure that the propositions
+corresponding to the statically typed parts of the program hold true during
+runtime when values flow between the static-dynamic boundary. This should make
+programming using dependent types more accessible since programmers can have a
+running program even when the correctness of programs is partially specified and
+verified.
 
 This literature review will go over the systems described in the list of papers
 mentioned in the question above. We will discuss the following gradual dependent
@@ -160,14 +203,156 @@ In this document we will constantly be referring to a static dependently-typed
 language which gets gradualized by adding \verb|?| to the static language to get
 a gradual surface language. We will also be referring to an intermediate
 language like the cast calculus which the gradual surface language elaborates
-into. Following the typographic conventions of Eremondi in
-\cite{eremondi_design_2023}, we will typeset static dependently-typed terms in
-\Scode{red san-serif font}, gradual surface terms in \Gcode{green italic serif
-  font} and elaborated intermediate terms in \Ccode{blue bold serif font}.
+into. Following the typographic conventions in \citet{eremondi_design_2023}, we
+will typeset static dependently-typed terms in \Scode{red san-serif font},
+gradual surface terms in \Gcode{green italic serif font} and elaborated
+intermediate terms in \Ccode{blue bold serif font}.
 
-GDTL is the first system which gradualizes full-spectrum dependent types by
-adding the \Gcode{?} type in its type
-system.\cite{eremondi_approximate_2019}\cite{lennon-bertrand_gradualizing_2022}
+In 2019, \citet{eremondi_approximate_2019} introduced GDTL which was the first
+system which gradualizes full-spectrum dependent types by adding the \Gcode{?}
+type in its type system. GDTL was later refined in Eremondi's 2023 PhD. thesis
+\cite{eremondi_design_2023}. GDTL follows the AGT (Abstracting Gradual Typing)
+approach pioneered in \citet{garcia_abstracting_2016}. Later in 2022,
+\citet{lennon-bertrand_gradualizing_2022} introduced GCIC which highlights the
+tension between three properties expected from a gradual dependent type theory
+and how to design type theory variants addressing this tension. Later in the
+same year, \citet{maillard_reasonably_2022} extended one of the variants of GCIC
+to develop GRIP which was better suited to be a proof assistant. Simultaneously,
+\citet{eremondi_propositional_2022} presented GEq which addresses how to
+gradualize the propositional equality type in a different variant of GCIC which
+was better suited to be a programming language. Independent of the GCIC and GDTL
+lines of research, \citet{shi_partial_2023} (2023) introduces PGTT, which frames
+gradualization as a transformation between static non-dependently typed programs
+and static dependently typed programs, rather than between dynamically typed
+programs and static dependently typed programs. Finally in 2024,
+\citet{malewski_gradual_2024} extend GRIP to incorporate indexed inductive types
+and call this system PUNK.
+
+%Dependently-typed systems evaluate terms during type-checking. The evaluation is
+%thus expected to terminate without producing dynamic type errors in order to let
+%the type-checking procedure terminate. Adding \Gcode{?}, however, introduces the
+%side effects of divergence and cast errors during the type-checking phase which
+%is in tension with dependent type-checking. GDTL solves this issue by using an
+%evaluation procedure called approximate normalization which we will discuss
+%later.
+%
+%While GDTL doesn't account for inductive types, GCIC addresses this by
+%gradualizing the calculus of inductive
+%constructions(CIC)\cite{coquand_calculus_1988}. GCIC addresses the divergence of
+%type-checking issue by presenting the Fire Triangle of Graduality theorem. It
+%states that in order to avoid divergence (i.e. achieve \textit{strong
+%  normalization}), a gradual dependently typed system needs to give up on some
+%other important properties, namely \textit{graduality} and
+%\textit{conservativity}. New and Ahmed\cite{new_graduality_2018} introduce
+%graduality as a semantic reformulation of the gradual guarantees. Meanwhile,
+%conservativity of a gradual type system with respect to a static type system
+%states that all terms in the gradual system in which \Gcode{?} doesn't occur
+%should coincide with terms in the static system. Each variant of GCIC presented
+%in \cite{lennon-bertrand_gradualizing_2022} gives up on one property mentioned
+%in the Fire Triangle theorem. The variant which gives up strong normalization
+%(\(\mathcal{N}\)) is \GCICG{}, the \GCICN{} variant gives up graduality
+%(\(\mathcal{G}\)) and the \GCICS{} variant gives up conservativity with respect to
+%CIC (\(\mathcal{C}\)\textsubscript{/CIC}). The cast calculus which GCIC
+%elaborates to is called CastCIC. The cast calculi for \GCICG{}, \GCICN{} and \GCICS{}
+%variants are \CCICG, \CCICN and \CCICS, respectively.
+%
+%Maillard et al.\cite{maillard_reasonably_2022} claim that \GCICN{} is the most
+%appealing system based on GCIC in the context of proof assistants. This is
+%because \GCICN{} ensures decidability of type-checking, (weak) canonicity, and
+%ensures that it supports existing CIC developments and libraries due to it being
+%conservative with respect to CIC. Even though \GCICN{} doesn't satisfy
+%graduality globally, Maillard et al. propose a novel method to prove the
+%graduality of a fragment of terms in \GCICN{} within \GCICN{} itself. They
+%present a modified version of \GCICN{} called GRIP which adopts a two-layer
+%structure: an impure hierarchy of types for gradual terms, and a pure sort of
+%propositions that can refer to gradual terms and errors, but whose inhabitants
+%cannot use errors or unknown terms. It is in this pure propositional sort that
+%they define precision as a type similar to how propositional equality types
+%internalize the equality relation in static dependent types.
+%
+%Even though GCIC provides gradual inductive types, it doesn't provide gradual
+%indexed inductive types which are essential to define the propositional equality
+%type. Eremondi et al. present GEq\cite{eremondi_propositional_2022} which adds
+%gradual propositional equality to \GCICG{} while preserving its properties.
+%Unlike GRIP which was designed to be used as a proof assistant, GEq's authors
+%designed it to be used as programming language with dependent types. \GCICG{}
+%was chosen as a base to develop GEq because the non-termination of type-checking
+%in \GCICG{} is not as detrimental for programming languages as compared to proof
+%assistants. Moreover, the graduality and conservativity with respect to CIC
+%properties of \GCICG{} are important for programming languages. Graduality
+%allows for ease of evolution of program from being dynamically typed to
+%statically typed, and conservativity allows the programmer to use the full
+%capabilities of CIC once all type annotations are static.
+%
+%Later in his thesis\cite{eremondi_design_2023}, Eremondi introduces \GGEq{}
+%which modifies GEq in order to get back decidable type-checking. \GGEq{} uses
+%approximate normalization from GDTL achieve decidable type-checking. The
+%decidability result is proven by building a syntactic model of \GGEq{} in a
+%variant of Guarded Type Theory (GTT). Eremondi conjectures that \GGEq{}
+%preserves the gradual guarantees and conservativity properties of GEq. He claims
+%that \GGEq{} avoids the Fire Triangle of Graduality theorem because it doesn't
+%restrict terms in the ways that GCIC variants do in order to fulfill the gradual
+%guarantees or conservatively extending CIC.
+%
+%GDTL, GCIC and GEq lack indexed inductive types, but they have a way to use a
+%restricted version of it. PUNK, however, is the first system to fully support
+%gradual indexed inductive types\cite{malewski_gradual_2024}. PUNK extends GRIP
+%by adding indexed inductive types to it. While presenting PUNK, Malewski et al.
+%highlight that there is no unique or generally better way to deal with casts on
+%type indices at runtime: there are just different possible semantics for cast
+%reduction, with different tradeoffs, just like there are different possible
+%semantics for higher-order casts in standard gradually-typed
+%languages\cite{siek_exploring_2009}. PUNK has 3 different semantics for reducing
+%multiple consecutive casts, namely free, meet and forgetful. As multiple casts
+%are applied during reduction to a constructor, PUNK accumulates the indices in
+%the casts' types into an index accumulator. An index accumulator \Ccode{acc} is
+%equipped with a term representing the empty accumulator \Ccode{\(\mathbbm{1}\)}
+%and an operation \(i \otimes\)\Ccode{\(acc\)} to extend an accumulator
+%\Ccode{\(acc\)} with an index \(i\). Malewski et al. parameterize PUNK
+%semantics based on how index accumulator operations are defined in order to get
+%the 3 different kinds of cast reduction semantics.
+%
+%PGTT adopts an approach which is different than the other systems mentioned
+%here. Instead of allowing programs to range from dynamically typed to static
+%dependently typed, PGTT allows programs to range from static non-dependently
+%typed to static dependently typed. This means that PGTT restricts entirely
+%unknown types and only permits dynamic terms on the type indices,. For example,
+%the type \Gcode{Vec n ?} is valid in PGTT, but \Gcode{?} as a type is invalid.
+%PGTT's restriction on entirely unknown types simplifies runtime type checks,
+%allows embedding into a static, dependently typed language, and reduces the
+%performance overhead induced by gradual typing.
+
+Now that we've had a bird's eye view of gradual full-spectrum dependently-typed
+systems in the current literature, the following sections delve deeper into
+these systems. Each of the following sections talks about the key design choices
+and their properties followed by the limitations and tradeoffs of the type
+system.
+
+\subsubsection{GDTL}
+
+\citet{eremondi_approximate_2019} derive GDTL from a static dependently-typed
+system called SDTL (\underline{S}tatic \underline{D}ependently \underline{T}yped
+\underline{L}anguage) which is a bidirectional, call-by-value variant of the
+predicative fragment of CC\(_\omega\)\cite{coquand_calculus_1988}. SDTL syntax
+of terms (metavariable \Scode{t} represents terms and \Scode{T} represents terms
+that are types) contains lambda abstraction (\Scode{\(\lambda\)x.t}),
+application (\Scode{t\(_1\) t\(_2\)}), dependent function type (\Scode{(x :
+  T\(_1\)) \(\to\) T\(_2\)}), type universes (\Scode{Type\(_\ell\)} is a
+universe at level \(\ell\)) and type ascription (\Scode{t::T}). SDTL is
+bidirectionally type-checked and the type-checking rules ensure that two types
+are the same by comparing their \(\alpha\)-equivalent, \(\beta\)-reduced,
+\(\eta\)-long normal forms. The authors of GDTL then apply the AGT (Abstracting
+Gradual Typing) methodology\cite{garcia_abstracting_2016} to SDTL to
+systematically add \Gcode{?} to the static language. AGT alone is not enough to
+incorporate the side-effects of divergence and type-mismatch errors, so the
+authors of GDTL decided to use a separate notion of normalization during
+type-checking called approximate normalization which terminates without raising
+errors, but gives imprecise results. Approximate normalization is a major
+contribution of GDTL and we will expand on it soon.
+
+\subsubsection{Design Decisions and Their Properties}\label{subsec:gdtl_design_properties}
+
+\paragraph{Introducing the unknown term}
 A natural consequence of adding the \Gcode{?} type to a dependently-typed system
 and the fact that dependent types are dependent on terms is that such a system
 will also require us to add \Gcode{?} as a term. An example of why one would
@@ -181,135 +366,7 @@ natural number type. Thus, even though \Gcode{?} occurs in a type it is actually
 a term. GDTL and the other systems discussed in this literature review all have
 \Gcode{?} as a term in some form.
 
-Dependently-typed systems evaluate terms during type-checking. The evaluation is
-thus expected to terminate without producing dynamic type errors in order to let
-the type-checking procedure terminate. Adding \Gcode{?}, however, introduces the
-side effects of divergence and cast errors during the type-checking phase which
-is in tension with dependent type-checking. GDTL solves this issue by using an
-evaluation procedure called approximate normalization which we will discuss
-later.
-
-While GDTL doesn't account for inductive types, GCIC addresses this by
-gradualizing the calculus of inductive
-constructions(CIC)\cite{coquand_calculus_1988}. GCIC addresses the divergence of
-type-checking issue by presenting the Fire Triangle of Graduality theorem. It
-states that in order to avoid divergence (i.e. achieve \textit{strong
-  normalization}), a gradual dependently typed system needs to give up on some
-other important properties, namely \textit{graduality} and
-\textit{conservativity}. New and Ahmed\cite{new_graduality_2018} introduce
-graduality as a semantic reformulation of the gradual guarantees. Meanwhile,
-conservativity of a gradual type system with respect to a static type system
-states that all terms in the gradual system in which \Gcode{?} doesn't occur
-should coincide with terms in the static system. Each variant of GCIC presented
-in \cite{lennon-bertrand_gradualizing_2022} gives up on one property mentioned
-in the Fire Triangle theorem. The variant which gives up strong normalization
-(\(\mathcal{N}\)) is \GCICG{}, the \GCICN{} variant gives up graduality
-(\(\mathcal{G}\)) and the \GCICS{} variant gives up conservativity with respect to
-CIC (\(\mathcal{C}\)\textsubscript{/CIC}). The cast calculus which GCIC
-elaborates to is called CastCIC. The cast calculi for \GCICG{}, \GCICN{} and \GCICS{}
-variants are \CCICG, \CCICN and \CCICS, respectively.
-
-Maillard et al.\cite{maillard_reasonably_2022} claim that \GCICN{} is the most
-appealing system based on GCIC in the context of proof assistants. This is
-because \GCICN{} ensures decidability of type-checking, (weak) canonicity, and
-ensures that it supports existing CIC developments and libraries due to it being
-conservative with respect to CIC. Even though \GCICN{} doesn't satisfy
-graduality globally, Maillard et al. propose a novel method to prove the
-graduality of a fragment of terms in \GCICN{} within \GCICN{} itself. They
-present a modified version of \GCICN{} called GRIP which adopts a two-layer
-structure: an impure hierarchy of types for gradual terms, and a pure sort of
-propositions that can refer to gradual terms and errors, but whose inhabitants
-cannot use errors or unknown terms. It is in this pure propositional sort that
-they define precision as a type similar to how propositional equality types
-internalize the equality relation in static dependent types.
-
-Even though GCIC provides gradual inductive types, it doesn't provide gradual
-indexed inductive types which are essential to define the propositional equality
-type. Eremondi et al. present GEq\cite{eremondi_propositional_2022} which adds
-gradual propositional equality to \GCICG{} while preserving its properties.
-Unlike GRIP which was designed to be used as a proof assistant, GEq's authors
-designed it to be used as programming language with dependent types. \GCICG{}
-was chosen as a base to develop GEq because the non-termination of type-checking
-in \GCICG{} is not as detrimental for programming languages as compared to proof
-assistants. Moreover, the graduality and conservativity with respect to CIC
-properties of \GCICG{} are important for programming languages. Graduality
-allows for ease of evolution of program from being dynamically typed to
-statically typed, and conservativity allows the programmer to use the full
-capabilities of CIC once all type annotations are static.
-
-Later in his thesis\cite{eremondi_design_2023}, Eremondi introduces \GGEq{}
-which modifies GEq in order to get back decidable type-checking. \GGEq{} uses
-approximate normalization from GDTL achieve decidable type-checking. The
-decidability result is proven by building a syntactic model of \GGEq{} in a
-variant of Guarded Type Theory (GTT). Eremondi conjectures that \GGEq{}
-preserves the gradual guarantees and conservativity properties of GEq. He claims
-that \GGEq{} avoids the Fire Triangle of Graduality theorem because it doesn't
-restrict terms in the ways that GCIC variants do in order to fulfill the gradual
-guarantees or conservatively extending CIC.
-
-GDTL, GCIC and GEq lack indexed inductive types, but they have a way to use a
-restricted version of it. PUNK, however, is the first system to fully support
-gradual indexed inductive types\cite{malewski_gradual_2024}. PUNK extends GRIP
-by adding indexed inductive types to it. While presenting PUNK, Malewski et al.
-highlight that there is no unique or generally better way to deal with casts on
-type indices at runtime: there are just different possible semantics for cast
-reduction, with different tradeoffs, just like there are different possible
-semantics for higher-order casts in standard gradually-typed
-languages\cite{siek_exploring_2009}. PUNK has 3 different semantics for reducing
-multiple consecutive casts, namely free, meet and forgetful. As multiple casts
-are applied during reduction to a constructor, PUNK accumulates the indices in
-the casts' types into an index accumulator. An index accumulator \Ccode{acc} is
-equipped with a term representing the empty accumulator \Ccode{\(\mathbbm{1}\)}
-and an operation \(i \otimes\)\Ccode{\(acc\)} to extend an accumulator
-\Ccode{\(acc\)} with an index \(i\). Malewski et al. parameterize PUNK
-semantics based on how index accumulator operations are defined in order to get
-the 3 different kinds of cast reduction semantics.
-
-PGTT adopts an approach which is different than the other systems mentioned
-here. Instead of allowing programs to range from dynamically typed to static
-dependently typed, PGTT allows programs to range from static non-dependently
-typed to static dependently typed. This means that PGTT restricts entirely
-unknown types and only permits dynamic terms on the type indices,. For example,
-the type \Gcode{Vec n ?} is valid in PGTT, but \Gcode{?} as a type is invalid.
-PGTT's restriction on entirely unknown types simplifies runtime type checks,
-allows embedding into a static, dependently typed language, and reduces the
-performance overhead induced by gradual typing.
-
-Now that we've had a bird's eye view of gradual full-spectrum dependently-typed
-systems in the current literature, section \ref{subsec:design_properties} delves
-deeper into some key design decisions made in these systems and what kind of
-properties do these decisions influence. Section
-\ref{subsec:tradeoffs_drawbacks} discusses the tradeoffs that come with the
-design decisions and drawbacks of the systems. Finally, section
-\ref{subsec:future} mentions the work that we still need to do in this area of
-research and improvements which we can make to current gradual full-spectrum
-dependently-typed systems.
-
-\subsection{Design Decisions and Their Properties}\label{subsec:design_properties}
-
-In this section we will discuss the design of gradual dependently-typed systems
-discussed in the previous section along with which properties they satisfy.
-
-\subsubsection{GDTL}
-
-Eremondi, Tanter and Garcia\cite{eremondi_approximate_2019} derive GDTL from a
-call-by-value static dependently-typed system called SDTL (a \underline{S}tatic
-\underline{D}ependently \underline{T}yped \underline{L}anguage). SDTL syntax of
-terms (metavariable \Scode{t} represents terms and \Scode{T} represents terms
-that are types) contains lambda abstraction (\Scode{\(\lambda\)x.t}),
-application (\Scode{t\(_1\) t\(_2\)}), dependent function type (\Scode{(x :
-  T\(_1\)) \(\to\) T\(_2\)}), type universes (\Scode{Type\(_\ell\)} is a
-universe at level \(\ell\)) and type ascription (\Scode{t::T}). SDTL is
-bidirectionally type-checked and the type-checking rules ensure that two types
-are the same by comparing their \(\beta\)-reduced, \(\eta\)-long normal forms.
-The authors of GDTL then apply the AGT (Abstracting Gradual Typing)
-methodology\cite{garcia_abstracting_2016} to SDTL to systematically add
-\Gcode{?} to the static language. AGT alone is not enough to incorporate the
-side-effects of divergence and type-mismatch errors, so the authors of GDTL
-decided to use a separate notion of normalization during type-checking called
-approximate normalization which terminates without raising errors, but gives
-imprecise results. Approximate normalization is a major contribution of GDTL and
-we will expand on it soon.
+\paragraph{Approximate hereditary substitution ensures termination of typechecking}
 
 GDTL, being the first system to introduce gradual typing into a
 dependently-typed system, addresses the major conflicts between the two typing
@@ -357,8 +414,25 @@ Untyped Lambda Calculus which will lead to non-termination during type-checking.
       \item gradual guarantees
     \end{itemize}
 \end{itemize}
+\subsubsection{Tradeoffs and Drawbacks}
+\begin{enumerate}
+  \item Hereditary substitution doesn't scale well for gradual typing because of
+    the explosion of rules which get added in order to preserve termination
+    whenever we add a new feature to the system.
+  \item AGT was used in hopes of deriving a systematic way to derive a gradual
+    dependently-typed language. Though it succeeds in helping us derive
+    metafunctions, it doesn't seem to give us a straightforward way to derive
+    approximate normalization which is a key feature.
+  \item Approximate normalization results in a \Gcode{?} either if the
+    type-checker decides that a function application diverges or if there's a
+    type mismatch. Thus, when the normalization process gives us a \Gcode{?}, it
+    becomes difficult to identify why normalization failed.
+  \item GDTL doesn't support features that a practical dependently typed
+    programming language needs.
+\end{enumerate}
 
 \subsubsection{GCIC}
+\subsubsection{Design Decisions and Their Properties}
 \begin{itemize}
   \item Lennon-Bertrand, Maillard and
     Tabareau\cite{lennon-bertrand_gradualizing_2022} design GCIC by gradualizing
@@ -406,6 +480,10 @@ Untyped Lambda Calculus which will lead to non-termination during type-checking.
     of inference rules get reused
   \item Syntax of surface language
   \item Syntax of cast language
+  \item Reduction rules of CastCIC
+    \begin{itemize}
+      \item IND-GERM and PROD-GERM rules are defined according to the discrete model.
+    \end{itemize}
   \item Elaboration and its properties
     \begin{itemize}
       \item Usually elaboration judgment uses types from the source language,
@@ -423,44 +501,129 @@ Untyped Lambda Calculus which will lead to non-termination during type-checking.
   \item Properties of GCIC and models built to prove them
 \end{itemize}
 
-\subsubsection{GRIP}
-\subsubsection{GEq}
-\subsubsection{\GGEq{}}
-\subsubsection{PUNK}
-\subsubsection{PGTT}
-
-\subsection{Tradeoffs and Drawbacks}\label{subsec:tradeoffs_drawbacks}
-\subsubsection{GDTL}
-\begin{enumerate}
-  \item Hereditary substitution doesn't scale well for gradual typing because of
-    the explosion of rules which get added in order to preserve termination
-    whenever we add a new feature to the system.
-  \item AGT was used in hopes of deriving a systematic way to derive a gradual
-    dependently-typed language. Though it succeeds in helping us derive
-    metafunctions, it doesn't seem to give us a straightforward way to derive
-    approximate normalization which is a key feature.
-  \item Approximate normalization results in a \Gcode{?} either if the
-    type-checker decides that a function application diverges or if there's a
-    type mismatch. Thus, when the normalization process gives us a \Gcode{?}, it
-    becomes difficult to identify why normalization failed.
-  \item GDTL doesn't support features that a practical dependently typed
-    programming language needs.
-\end{enumerate}
-\subsubsection{GCIC}
+\subsubsection{Tradeoffs and Drawbacks}
 \begin{itemize}
   \item Writing down universe levels is tedious. Lennon-Bertrand et al.
     recommend typical ambiguity \cite{harper_type_1991} as the solution.
+    \item \(\eta\)-expansion is not addressed here (and in future papers).
 \end{itemize}
+\subsection{GRIP}
+\subsubsection{Design Decisions and Their Properties}
+\subsubsection{Tradeoffs and Drawbacks}
+\subsection{GEq}
+\subsubsection{Design Decisions and Their Properties}
+\citet{eremondi_propositional_2022} extend \GCICG{} with the propositional
+equality type \Gcode{=}, its constructor \Gcode{refl} and eliminator \Gcode{J}
+to create GEq. GEq elaborates into CastEq where the constructor \Ccode{refl}
+carries a witness term along with it which is at least as precise as the terms
+being equated in its type. As the program evaluates, these witnesses track
+partial type information from casts of the equality type and raises a runtime
+error when the information indicates that inconsistent terms are being equated.
+CastEq also has a composition operator \Ccode{\&} which takes two witnesses and
+returns a witness term whhich is at least as precise as its inputs. The CastEq
+reduction rules use \Ccode{\&} to update a witness term by composing it with
+terms occurring in the equality type of a cast.
 
-\subsubsection{GRIP}
-\subsubsection{GEq}
-\subsubsection{\GGEq{}}
-\subsubsection{PUNK}
-\subsubsection{PGTT}
+%TODO: shorten this para
+To illustrate how the witness and \Ccode{\&} catch errors,
+\citet{eremondi_propositional_2022} started by considering the fixed-length list
+type \Gcode{FList A n} representing a list containing \(n\) elements of type
+\Gcode{A} and it is defined as the dependent product \(\Gcmath{\Sigma\ x
+  :\textit{List} A.\ \textit{length}\ x =_\mathbb{N}\ n}\). Now consider the
+following two functions operating on \Gcode{FList}s:
+\[\Gcmath{\textit{zip}:\Pi\ (n:\mathbb{N}).\
+    \textit{FList}\ \textit{Float}\ n \to \textit{FList}\ \textit{Float}\ n
+    \to \textit{FList}\ (\textit{Float}\times\textit{Float})\ n}\]
+\[\Gcmath{\textit{take}:\Pi\ (n:\mathbb{N}) (m:\mathbb{N}).\
+    \textit{FList}\ \textit{Float}\ (n+m) \to
+    \textit{FList}\ \textit{Float}\ n}\] \Gcode{zip} takes two lists of the same
+length containing floating point numbers and returns another list of the same
+length containing element-wise pairs of the two input lists. \Gcode{take}
+returns an \Gcode{FList} containing the first \(n\) elements of the input
+\Gcode{FList} of length \(n + m\). Here are some imprecise lists which we will
+use as arguments for our functions:
+\[\Gcmath{\textit{list}_1\ :=\ ([1.1,2.2], \textit{refl}_?):\textit{FList Float } ?}
+\quad \quad \quad \quad \Gcmath{\textit{list}_2\ :=\ (\textit{Cons}(1.1, ?),
+  \textit{refl}_?):\textit{FList Float } ?}\] The second projection of
+\(\Gcmath{\textit{list}_1}\) satisfies the type \(\Gcmath{2\ =_\mathbb{N}\ ?}\)
+because the length of the first projection is 2 and \Gcode{2} is consistent with
+\Gcode{?}. The first projection is an imprecise list of length \(\Gcmath{1+?}\),
+so the second projection satisfies the type \(\Gcmath{1+?\ =_\mathbb{N}\ ?}\)
+again because \Gcode{1+?} and \Gcode{?} are consistent. Thus the term
+\(\Gcmath{\textit{zip}\ ?\ list_1\ list_2}\) also synthesizes the type
+\Gcode{FList Float ?} because the length of its inputs and its first argument is
+\Gcode{?}. Finally the term
+\(\Gcmath{\textit{take}\ 3\ ?\ (\textit{zip}\ ?\ list_1\ list_2)}\) has the type
+\Gcode{FList Float 3} because the type of
+\(\Gcmath{\textit{zip}\ ?\ list_1\ list_2}\) is consistent with the type
+\Gcode{FList Float (3+?)} which is the type of the third formal parameter of
+\Gcode{take}. Without witness checks, the result of evaluating \Gcode{take}
+would be the list \Gcode{Cons((1.1,1.1), ?)}. However, GEq instead raises an
+error because the witnesses stored in elaborated \Ccode{refl} terms of
+\Ccode{list}\(\Ccmath{_1}\) and \Ccode{list}\(\Ccmath{_2}\) get composed as they
+get evaluated until they can no longer be composed with the types in the cast
+introduced by the expected type of \Ccode{take 3}. Initially the witness of
+\Ccode{refl} is \(\Ccmath{?_{\square}}\), but when it is used to construct
+\Ccode{list}\(\Ccmath{_1}\) it needs to be cast into the type
+\(\Ccmath{2\ =_\mathbb{N}\ ?_\square}\). The equality type cast then causes the
+witness term \(\Ccmath{?_{\square}}\) to be composed with \Ccode{2} and
+\(\Ccmath{?_\square}\) which are the terms in the cast. The result of
+composition is \Ccode{2} because it is the most precise term and then \Ccode{2}
+becomes the new witness of the \Ccode{refl} in \Ccode{list}\(\Ccmath{_1}\). The
+witness of the second projection of the result of \Ccode{zip} is also \Ccode{2}
+because it has been the most precise term while the second projection of
+\Ccode{list}\(\Ccmath{_1}\) was going through various casts to compute the
+result of \Ccode{zip}. Eventually the cast introduced by \Ccode{take 3} tries to
+compose the witness \Ccode{2} with the term \Ccode{3+?} which comes from the
+expected size of \Ccode{take}'s input list. This composition fails because
+\Ccode{2} ,i.e. \Ccode{S(S(0))} and \Ccode{3+?}, i.e. \Ccode{S(S(S(?)))} are not
+consistent.
 
-\subsection{Future Work}\label{subsec:future}
+\subsubsection{Tradeoffs and Drawbacks}
+\subsection{\GGEq{}}
+\subsubsection{Design Decisions and Their Properties}
+\subsubsection{Tradeoffs and Drawbacks}
+\subsection{PUNK}
+\subsubsection{Design Decisions and Their Properties}
+\subsubsection{Tradeoffs and Drawbacks}
+\subsection{PGTT}
+\subsubsection{Design Decisions and Their Properties}
+PGTT follows a 2-step approach where a gradual dependently typed language
+\(\lambda^S\) gets elaborated into an intermediate cast calculus \(\lambda^I\)
+and then into a purely static dependently typed language \(\lambda^C\). Instead
+of allowing \(?\) as a type or a term, \(\lambda^S\) only permits \(?\) as a
+type index like \(\text{Vec}(\mathbb{N}, ?)\). However, \(\text{Vec}(?, 0)\) is
+an invalid type because a type universe cannot contain a dynamic term. This
+ensures that all values have a constructor head even if their type contains an
+unknown index. \citet{shi_partial_2023} claims that allowing dynamic terms only
+on the type indices ensures normalization without proof. Since the target
+language is purely static, PGTT has simpler and more efficient runtime checks.
 
-\section{Implementing GCIC}
+Unlike \citet{lennon-bertrand_gradualizing_2022} who interpret the \(?\)
+term as a dependent sum to build a discrete model of GCIC for a proof, PGTT's
+semantics directly elaborates types with unknown indices in \(\lambda^S\) like
+\(\text{Vec}(\mathbb{N}, \text{suc}(?))\) into dependent sums like \(\Sigma
+(i:\mathbb{N}).\text{Vec}(\mathbb{N}, \text{suc}(i))\) in \(\lambda^I\). To be
+precise, they elaborate into telescopes so that a type with multiple unknown
+indices like \(\text{Vec}(\text{Vec}(\mathbb{N}, \text{suc}(?)), ?)\) elaborates
+into the telescope
+\((x:\mathbb{N})\triangleright(y:\mathbb{N})\triangleright\text{Vec}(\text{Vec}(\mathbb{N},
+\text{suc}(x)), y)\). During elaboration into \(\lambda^I\), if the type indices
+are consistent but not equal, then the elaborator inserts a cast on the
+telescope term. The elaborator from \(\lambda^I\) to \(\lambda^C\) transforms
+casts into runtime checks producing an error monad value while also inserting
+suitable monad operations like bind, return and fmap.
+
+\subsubsection{Tradeoffs and Drawbacks}
+PGTT gives up the ability to express fully dynamic programs in exchange for
+useful properties like normalization and a better runtime.
+\citet{shi_partial_2023} explains the elaboration process using an example with
+a projection cast out of the dynamic term, so it is unclear how an injection
+cast into \(?\) will be elaborated. A more detailed critique of PGTT seems
+difficult because of the brevity of its description in \citet{shi_partial_2023}
+which lacks any syntax, typechecking or elaboration rules.
+
+\section{Implementing GCIC}\label{sec:question2}
 
 \subsection{The Question}
 Implement a type checker that matches as closely as you can one of the language
@@ -471,21 +634,483 @@ there anything that makes the combination of gradual typing and dependent types
 difficult to handle in the implementation of a type checker? Are there any
 results in the literature that can help overcome those difficulties?
 
-\subsection{Notes}
-\begin{itemize}
-  \item Locally nameless representation \cite{chargueraud_locally_2012}
-  \item Refocusing in reduction semantics \cite{danvy_refocusing_2004}
-  \item Inductive eliminators are not guarded i.e. no termination checking is
-    done. (see Eduardo Giménez, 1998. Structural recursive definitions in type
-    theory)
-  \item No well-formedness (and, in particular, strict positivity) checks on inductive
-    type definitions (also see Eduardo Giménez, 1998)
-  \item \(\alpha\)-consistency rules don't specify how the universe levels in
-    constructor and inductive type instantiations are related. Right now we add
-    the check that the two levels should be the same.
-\end{itemize}
+\subsection{About The GCIC Implementation}
 
-\section{Dogfooding our implementation}
+Since most of the gradual dependent type theories in the current literature are
+extensions of GCIC, I have decided to implement this system. Ideally, in the
+future, I should be able to extend this implementation to implement GRIP, GEq,
+\GGEq{} and PUNK. I have implemented GCIC using Racket. Even though my
+implementation of GCIC accepts an s-expression based syntax, while referring to
+the syntax, I will translate the s-expression syntax to a GCIC-like syntax
+presented in \citet{lennon-bertrand_gradualizing_2022} for the rest of this
+document. The source code for this implementation is at:
+\url{https://github.com/DarshalShetty/QualExam/tree/main/GCIC-implementation}.
+My implementation consists of three phases that an input GCIC program goes
+through: parsing, elaboration and evaluation.
+
+The parsing phase accepts a GCIC program and outputs an Abstract Syntax Tree
+(AST). The \texttt{parse} function in \texttt{syntax.rkt} initiates this phase.
+\texttt{parse} emits an AST only after checking that the input program is
+syntactically valid.
+%validates the syntax by checking that the
+%main term in the input program has no free variables and contains syntactically
+%valid inductive type instantiation, inductive term constructors and inductive
+%eliminators. A syntactically valid inductive type instantiation is one which
+%refers to an inductive type name declared in the sequence of inductive type
+%definitions at the beginning of the program. A syntactically valid inductive
+%term constructor is one which refers to a constructor name declared in one of
+%the inductive types in the sequence of inductive type definitions at the
+%beginning of the program. A syntactically valid inductive eliminator is one
+%whose branches handle all the constructors of the inductive type whose term is being
+%eliminated.
+Here is an example of a GCIC program in the implementation which highlights how
+this syntax differs from that of \citet{lennon-bertrand_gradualizing_2022}:
+\begin{example}[A simple \GCICN{} program]
+\label{ex:simple}\
+\begin{lstlisting}[mathescape,language=GCIC]
+variant gcic-n
+data Nat := zero | succ (_ : Nat$_{@\{0\}}$()).
+data Bool := true | false.
+
+ind$_\texttt{Nat}$(succ$_{@\{0\}}$(zero$_{@\{0\}}$()), _. Bool$_{@\{0\}}$(), _,
+  zero => true$_{@\{0\}}$(),
+  succ(_) => false$_{@\{0\}}$())
+\end{lstlisting}
+\end{example}
+\noindent The above \GCICN{} program defines the \Gcode{Nat} and \Gcode{Bool}
+inductive types\footnote{These inductive definitions omit the return type of
+constructors and the type of the inductive type itself because the lack of
+indexed inductive types makes it obvious what the ommitted types should be.}.
+%Since there are no indexed inductive types, we omit specifying the
+%type of the inductive type and their constructors in the definition. Thus, the
+%type of \Gcode{Nat} and \Gcode{Bool} are not mentioned in the inductive
+%definition and we assume their type to be \(\Gcmath{\square}\). Similarly, we
+%omit the type of the constructors \Gcode{zero} and \Gcode{succ} because they
+%have to be of type \Gcode{Nat()} and type of constructors \Gcode{true} and
+%\Gcode{false} have to be of type \Gcode{Bool()}. If the universe level is 0,
+%then the implementation allows us to omit the \(\Gcmath{_{@\{0\}}}\) annotation
+%from the inductive type and term constructors.
+The term at the end of the program is eliminating the unary representation of
+the natural number 1 by returning a boolean term for each of the \Gcode{Nat()}
+constructors.
+
+The elaboration phase performs bidirectional typechecking on the inductive
+definitions and the main term and then returns a corresponding CastCIC term. The
+\texttt{elab-program} function defined in \texttt{elaboration.rkt} initiates the
+elaboration phase. \texttt{elab-program} follows the elaboration rules in Fig. 9
+of \citet{lennon-bertrand_gradualizing_2022}. Running \texttt{elab-program} on
+Example~\ref{ex:simple} produces the same program, so we will consider how
+\texttt{elab-program} adds casts on the following slightly modified version of
+Example~\ref{ex:simple}:
+\begin{example}[Modified \GCICN{} program]
+\label{ex:simple-unk}
+The return type of the inductive eliminator is \Gcsub{?}{@\{1\}} and not
+\Gcsub{Bool}{@\{0\}}\Gcode{()}.
+\begin{lstlisting}[mathescape,language=GCIC]
+variant gcic-n
+data Nat := zero | succ (_ : Nat$_{@\{0\}}$()).
+data Bool := true | false.
+
+ind$_\texttt{Nat}$(succ$_{@\{0\}}$(zero$_{@\{0\}}$()), _. ?$_{@\{1\}}$, _,
+  zero => true$_{@\{0\}}$(),
+  succ(_) => false$_{@\{0\}}$())
+\end{lstlisting}
+\end{example}
+\noindent Here is the result of invoking \texttt{elab-program} on
+Example~\ref{ex:simple-unk}:
+\begin{example}[Elaborated Example~\ref{ex:simple-unk}]
+\label{ex:simple-unk-cast}\
+\begin{lstlisting}[mathescape,language=CCIC]
+variant gcic-n
+data Nat := zero | succ (_ : Nat$_{@\{0\}}$()).
+data Bool := true | false.
+
+ind$_\texttt{Nat}$(succ$_{@\{0\}}$(zero$_{@\{0\}}$()), _. <$\square_0$ $\Leftarrow$  ?$_{\square_{1}}$> ?$_{\texttt{?}_{\square_{1}}}$, _,
+  zero => <?$_{\square_{0}}$ $\Leftarrow$ Bool$_{@\{0\}}$()> true$_{@\{0\}}$(),
+  succ(_) => <?$_{\square_{0}}$ $\Leftarrow$ Bool$_{@\{0\}}$()> false$_{@\{0\}}$())
+\end{lstlisting}
+\end{example}
+
+\noindent Notice how casts gets introduced around \Ccode{true} and
+\Ccode{false}. \texttt{elab-program} also inserts casts into inductive
+definitions when the parameter or argument types contain the unknown term
+\Gcode{?}. The implementation of elaboration rules also adds some optimizations
+which we will discuss in Section \ref{sec:elab-optimize}.
+
+The elaboration rules require normalized types for checking if two types are the
+same. For example, consider the following function application term:
+\[
+\Gcmath{(\lambda x : ((\lambda t : \square_0.\, t)\ \text{\Gcode{Nat}}_{@\{0\}}()).\, x)\ \text{\Gcode{zero}}_{@\{0\}}()}
+\]
+For the above expression to typecheck and elaborate, the elaborated type of the
+function parameter \Gcode{x} and the elaborated type of the function argument
+\Gcsub{zero}{_{@\{0\}}}\Gcode{()} should be \(\alpha\)-equivalent. The
+elaborated function parameter type \(\Gcmath{(\lambda t : \square_0.\, t)
+  \text{\Gcode{Nat}}_{@\{0\}}()}\) and the function argument type
+\Gcsub{Nat}{@\{0\}}\Gcode{()}, however, are not \(\alpha\)-equivalent unless we
+normalize both types. The evaluation phase described next provides the
+\texttt{normalize} function which performs both type normalization in this phase
+and input program evaluation in the next phase.
+%The CHECK elaboration rule requires us to check
+%whether two types are consistent and we implement this check by ensuring that
+%the normal forms of the CastCIC elaborations of the two types are
+%\(\alpha\)-consistent. The implementation executes \(\alpha\)-consistency checks
+%by following the rules in Fig. 8 of \cite{lennon-bertrand_gradualizing_2022}.
+%The implementation computes normal forms of CastCIC types by following the
+%normalization procedure performed in the normalization phase which we will
+%discuss next.
+
+The evaluation phase reduces the main CastCIC term generated by the elaboration
+phase until there are no more redexes left in the reduced term which
+\citet{gregoire_compiled_2002} refer to as \textit{strong reduction}. The
+\texttt{normalize} function in \texttt{evaluation.rkt} initiates the evaluation
+phase by performing strong reduction on the input CastCIC term. The
+implementation of \texttt{normalize} is based on the \(\mathcal{N}\) function
+from \citet{gregoire_compiled_2002}. \texttt{normalize} first performs
+\textit{symbolic weak reduction} by calling the \texttt{evaluate} function
+followed by a call to the \texttt{readback} function. Symbolic weak reduction
+produces a head normal form where reductions are not performed under variable
+binding sites like the body of a lambda or the body of an inductive elimination
+case. While performing weak symbolic reduction, \texttt{evaluate} uses the
+principle reductions from Fig. 5 of \citet{lennon-bertrand_gradualizing_2022}
+along with principle reduction rules which handle neutral terms which are stuck
+due to free variables. \texttt{evaluate} needs to deal with free variables
+because \texttt{readback} invokes \texttt{normalize} under variable binders
+which makes the bound variable occurrences seem like free variables. Instead of
+naively running a decompose-step-plug loop, \texttt{evaluate} fuses the
+plug-decompose portion of the loop into an efficient \texttt{refocus} function
+as described by \citet{danvy_refocusing_2004}. The abstract machine described in
+Section~4.4.2 of \citet{danvy_refocusing_2004} is the source of influence for
+\texttt{evaluate} which is essentially a call-by-name version of the CK abstract
+machine\cite{felleisen_control_1987}.
+
+%takes a term in head normal form and invokes
+%\texttt{normalize} under the binder for head normal forms that bind variables.
+%Symbolic weak reduction also handles reduction of free variables and the neutral
+%forms or stuck terms generated by these free variables. Symbolic weak reduction
+%is implemented by using Danvy and Nielsen's refocusing
+%procedure\cite{danvy_refocusing_2004} which makes the symbolic weak reduction
+%implementation tail-recursive. The principal reduction rules follow from Fig. 5
+%of \cite{lennon-bertrand_gradualizing_2022} along with more rules to handle free
+%variables and construct a spine representing neutral terms stuck on a free
+%variable. The readback process takes the result of symbolic weak reduction and
+%converts spines into CastCIC terms with free variables by mutually recursively
+%calling ize on sub-terms of a spine.
+To better understand how \texttt{normalize} works, consider the following
+function application term:
+\[
+\begin{aligned}
+  &\Ccmath{(\lambda x : \text{\Ccode{Nat}}_{@\{0\}}() \to \text{\Ccode{Nat}}_{@\{0\}}() .\, x)}\\
+  &\Ccmath{(\lambda y : \text{\Ccode{Nat}}_{@\{0\}}() .\,
+    \text{\CastTwo{\Ccode{Nat}\(_{@\{0\}}\)\Ccode{()}}
+      {\(?_{\square_0}\)}
+      {\Ccode{Nat}\(_{@\{0\}}\)\Ccode{()}}
+      {\Ccode{zero}\(_{@\{0\}}\)\Ccode{()}}})}
+\end{aligned}
+\]
+Here we are essentially applying the identity function to the constant zero
+function. The constant zero function not only returns \Ccode{zero} but also
+attaches two consecutive casts to it: from \Ccode{Nat} to \Ccode{?} and from
+\Ccode{?} back to \Ccode{Nat}. \texttt{normalize} reduces the above term to its
+strong normal form by \(\beta\)-reducing the identity function and then removing
+all casts by consecutively applying the UP-DOWN nd IND-IND rules from Fig.~5 of
+\citet{lennon-bertrand_gradualizing_2022}. First, \texttt{normalize} invokes
+\texttt{evaluate} with the term above produces the following term:
+\[
+\begin{aligned}
+  &\Ccmath{(\lambda y : \text{\Ccode{Nat}}_{@\{0\}}() .\,
+    \text{\CastTwo{\Ccode{Nat}\(_{@\{0\}}\)\Ccode{()}}
+      {\(?_{\square_0}\)}
+      {\Ccode{Nat}\(_{@\{0\}}\)\Ccode{()}}
+      {\Ccode{zero}\(_{@\{0\}}\)\Ccode{()}}})}
+\end{aligned}
+\]
+\texttt{evaluate} only applies the \(\beta\)-reduction. Since, symbolic weak
+reduction doesn't apply reduction rules under binding sites and
+\texttt{evaluate} implements symbolic weak reduction, it doesn't apply UP-DOWN
+and IND-IND on the body of \(\Ccmath{\lambda y}\). Finally, \texttt{normalize}
+invokes \texttt{readback} on the above head normal term produced by
+\texttt{evaluate} to produce the following strong normal term:
+\[
+\begin{aligned}
+  &\Ccmath{(\lambda y : \text{\Ccode{Nat}}_{@\{0\}}() .\,
+    \text{\Ccode{zero}\(_{@\{0\}}\)\Ccode{()}})}
+\end{aligned}
+\]
+\texttt{readback} recursively calls \texttt{normalize} on the body of
+\(\Ccmath{\lambda y}\) which then applies the reduction rules to remove the
+casts. If the variable \Gcode{y} occurred in the body of \(\Ccmath{\lambda y}\),
+then the recursive call to \texttt{normalize} would treat it as a stuck term.
+
+\subsection{Difference Between The Implementation And Specification Of GCIC}
+\label{sec:impl-differences}
+
+\subsubsection{Lack of well-formedness and termination checks}
+The specification of GCIC by \citet{lennon-bertrand_gradualizing_2022} assumes
+that the inductive types in GCIC are well-formed, but this GCIC implementation
+doesn't check whether the inductive type definitions in the surface program are
+well-formed. The means that we can define a non-well-formed inductive type in
+this implementation which will lead to a logical inconsistency. Similarly, the
+GCIC specification expects the recursive calls made by the fixpoint function
+provided by an inductive eliminator to be guarded in order to prevent
+non-termination. However, this GCIC implementation allows unguarded recursive
+calls. This means that if a non-decreasing argument is provided to the recursive
+call, the GCIC term will diverge even in the terminating variants \GCICN{} and
+\GCICS{}. We can implement these checks in the future by following the work of
+\citet{gimenez_structural_1998} as suggested by
+\citet{lennon-bertrand_gradualizing_2022}.
+
+\subsubsection{Absence of universe level polymorphism}
+The elaboration rules IND and CONS specified in Fig. 9 of
+\citet{lennon-bertrand_gradualizing_2022} use the metafunctions Params and Args
+in their premise. These metafunctions accept a universe level as an argument.
+Ideally, this universe level should instantiate a \textit{universe level
+  variable} used in the inductive definition of the type associated with the
+terms in the conclusions of the IND and CONS rules. Such universe level
+polymorphism enables the reuse of the same inductive definition for terms which
+refer to different universe levels. This GCIC implementation, however, doesn't
+support universe level polymorphism.
+
+For example, here is the inductive definition of the list type according to the
+GCIC specification:
+\begin{lstlisting}[mathescape,label=lst:list-def-i, language=GCIC]
+data List (A: $\square_i$) := null $|$ cons (_: A) (_: List$_{@\{i\}}$(A))
+\end{lstlisting}
+The variable \Gcode{i} is the \textit{universe level variable} mentioned earlier
+which GCIC can instantiate with a universe level from the set \(\mathbb{N}\).
+While elaborating the singleton list containing zero
+\Gcsub{cons}{@\{0\}}\Gcsub{(Nat}{@\{0\}}\Gcode{(),}
+\Gcsub{zero}{@\{0\}}\Gcsub{(),null}{@\{0\}}\Gcsub{(Nat}{@\{0\}}\Gcode{()))}, the
+Params and Args metafunctions will instantiate \Gcode{i} with \Gcode{0} because
+of the subscript \Gcode{0} in \Gcsub{cons}{@\{0\}}. Similarly, \Gcode{i} is
+instantiated with \Gcode{1} while elaborating the singleton list containing the
+natural number type \Gcsub{cons}{@\{1\}}\(\Gcmath{(\square_{0}}\)\Gcode{,}
+\Gcsub{Nat}{@\{0\}}\Gcsub{(),null}{@\{1\}}\(\Gcmath{(\square_{0}}\)\Gcode{))}.
+Right now, the implementation only allows elements of \(\mathbb{N}\) to be used
+as universe levels and doesn't allow polymorphic universe level variables like
+\Gcode{i} in inductive definitions.
+
+%This universe level is a
+%natural number from the set \(\mathbb{N}\) and not a unary natural number of
+%type \Gcode{Nat()}. GCIC instantiates \Gcode{i} when elaborating a list type
+%like \Gcsub{List}{@\{0\}}\Gcsub{(Nat}{@\{0\}}\Gcode{())} (list of natural
+%numbers) or a term of this type like
+%\Gcsub{cons}{@\{0\}}\Gcsub{(Nat}{@\{0\}}\Gcode{(),}
+%\Gcsub{zero}{@\{0\}}\Gcsub{(),null}{@\{0\}}\Gcsub{(Nat}{@\{0\}}\Gcode{()))}
+%(singleton list containing the number 0).
+%
+%When the elaboration algorithm elaborates the term
+%\Gcsub{cons}{@\{0\}}\Gcsub{(Nat}{@\{0\}}\Gcode{(),}
+%\Gcsub{zero}{@\{0\}}\Gcsub{(),null}{@\{0\}}\Gcsub{(Nat}{@\{0\}}\Gcode{()))},
+%first, the Params metafunction instantiates \Gcode{i} occurring in the parameter
+%types(s) of \Gcode{List}'s inductive definition with 0 and checks whether the
+%parameter input(s) passed to \Gcode{cons} matches the instantiated parameter
+%type(s). Params instantiates \Gcode{i} to 0 because of the subscript \Gcode{0}
+%in \Gcsub{cons}{@\{0\}}. Since the \Gcode{List} type definition has only one
+%parameter \Gcode{A} with the type \Gcmath{\(\square_i\)}, Params checks whether
+%the first input to \Gcode{cons}: \Gcsub{Nat}{@\{0\}}\Gcode{()}, has the
+%instantiated type \Gcmath{\(\square_0\)}.
+%
+%Second, the elaboration algorithm invokes the metafunction Args to ensure that
+%the next two inputs of \Gcode{cons}, i.e. its arguments, have the right type.
+%This is done by again instantiating \Gcode{i} with 0 but this time in the
+%argument types of the \Gcode{cons} constructor in the inductive definition of
+%\Gcode{List}. Then Args ensures that the two arguments of \Gcode{cons}:
+%\Gcsub{zero}{@\{0\}}\Gcode{()} and
+%\Gcsub{null}{@\{0\}}\Gcsub{(Nat}{@\{0\}}\Gcode{())}, inhabit the argument types
+%of \Gcode{cons} in the inductive definition after the necessary substitutions:
+%\Gcsub{Nat}{@\{0\}}\Gcode{()} and
+%\Gcsub{List}{@\{0\}}\Gcsub{(Nat}{@\{0\}}\Gcode{())}, respectively.
+%
+%Thus the constructor term \Gcsub{cons}{@\{0\}}\Gcsub{(Nat}{@\{0\}}\Gcode{(),}
+%\Gcsub{zero}{@\{0\}}\Gcsub{(),null}{@\{0\}}\Gcsub{(Nat}{@\{0\}}\Gcode{()))}
+%elaborates successfully because the type inhabitation checks made by the Params
+%and Args metafunctions on the inputs of the constructor succeed after
+%instantiating the universe level in the \Gcode{List} definition to 0. Due to
+%universe level polymorphism, the GCIC specification states that we can
+%successfully elaborate the constructor term
+%\Gcsub{cons}{@\{1\}}\(\Gcmath{(\square_{0}}\)\Gcode{,}
+%\Gcsub{Nat}{@\{0\}}\Gcsub{(),null}{@\{1\}}\(\Gcmath{(\square_{0}}\)\Gcode{))}
+%(singleton list containing the type \Gcsub{Nat}{@\{0\}}) which inhabits the same
+%\Gcode{List} type. This is possible because in this case Params and Args
+%instantiate \Gcode{i} in the \Gcode{List} inductive definition to 1.
+%
+%Since the GCIC implementation doesn't have universe level polymorphism, we
+%cannot use the \Gcode{List} definition above which uses a polymorphic universe
+%level \Gcode{i}. Instead we would need multiple \Gcode{List} definitions with
+%the only difference between them being a different number for \Gcode{i}. To
+%successfully elaborate \Gcsub{cons}{@\{0\}}\Gcsub{(Nat}{@\{0\}}\Gcode{(),}
+%\Gcsub{zero}{@\{0\}}\Gcsub{(),null}{@\{0\}}\Gcsub{(Nat}{@\{0\}}\Gcode{()))} we
+%would need the following definition of \Gcode{List}:
+%\begin{lstlisting}[mathescape,label=lst:list-def-0, language=GCIC]
+%data List (A : $\square_0$) :=
+%$|$ null
+%$|$ cons (_ : A) (_ : List$_{@\{0\}}$(A))
+%\end{lstlisting}
+%This definition doesn't elaborate the term
+%\Gcsub{cons}{@\{1\}}\(\Gcmath{(\square_{0}}\)\Gcode{,}
+%\Gcsub{Nat}{@\{0\}}\Gcsub{(),null}{@\{1\}}\(\Gcmath{(\square_{0}}\)\Gcode{))}
+%because the type of the parameter \Gcode{A}, \(\Gcmath{\square_0}\), does not
+%inhabit the parameter of the constructor \(\Gcmath{\square_0}\). Instead, for
+%the new term to elaborate successfully, \Gcode{List} needs to be redefined with
+%universe level 1 as follows
+%\begin{lstlisting}[mathescape,label=lst:list-def-1, language=GCIC]
+%data List (A : $\square_1$) :=
+%$|$ null
+%$|$ cons (_ : A) (_ : List$_{@\{1\}}$(A))
+%\end{lstlisting}
+
+Since most example programs which I ran in this implementation don't need
+universe level polymorphism, I didn't consider adding this polymorphism feature
+crucial. In cases where polymorphism is needed, duplication of the inductive
+definition with a different universe level suffices. An alternative to
+implementing universe level polymorphism would be to add universe level lifting
+operators as described by \citet{maillard_reasonably_2022} for GRIP.
+
+\subsubsection{Fixing IND-IND reduction rule}\label{sec:fix-ind-ind}
+
+The IND-IND cast reduction rule from Fig. 5 of
+\citet{lennon-bertrand_gradualizing_2022} is ambiguous since it seems like the
+metavariable \(\Ccmath{\overline{a'}}\) appears out of nowhere. In order to fix
+this ambiguity, I took inspiration from
+\citet{lennon-bertrand_bidirectional_2022} which has cast reduction rules for
+the constructors of a specific list type. Generalizing the NIL-NIL and CONS-CONS
+reduction rules from Fig. 10.4b of \citet{lennon-bertrand_bidirectional_2022}
+for any inductive type constructor, I came up with the following updated IND-IND
+reduction rule for my implementation
+\[
+\begin{aligned}
+  &\text{\Cast{\(\Ccmath{I(\overline{a_2})}\)}
+              {\(\Ccmath{I(\overline{a_1})}\)}
+              {\(\Ccmath{c(\overline{a}, b_1, ..., b_n)}\)}}
+  \rightsquigarrow \Ccmath{c(\overline{a_2}, b'_1, ..., b'_n)}\\
+  &\text{with }
+    \Ccmath{b_k'} := \text{\Cast{\(\Ccmath{\text{Args}_k(I,i,c)[\overline{a_2},\overline{b}]}\)}
+                                {\(\Ccmath{\text{Args}_k(I,i,c)[\overline{a_1},\overline{b}]}\)}
+                                {\(\Ccmath{b_k}\)}}
+\end{aligned}
+\]
+The version of GCIC that uses the NIL-NIL and CONS-CONS reduction rules from
+\citet{lennon-bertrand_bidirectional_2022} satisfies the same theorems as the
+version specified by \citet{lennon-bertrand_gradualizing_2022}. I therefore
+conjecture that my GCIC implementation, which employs a generalized IND-IND
+reduction rule subsuming NIL-NIL and CONS-CONS, should also satisfy the theorems
+stated in \citet{lennon-bertrand_gradualizing_2022}.
+
+\subsubsection{Elaboration optimizations}\label{sec:elab-optimize}
+
+This GCIC implementation optimizes some of the elaboration rules so that the
+elaborated CastCIC term has to undergo fewer reduction steps when the
+normalization phase performs symbolic weak reduction on it. We will be referring
+to the elaboration rules from Fig. 9 of
+\citet{lennon-bertrand_gradualizing_2022}. The optimizations tweak the only rule
+for the checking judgment
+\ElabCheck{\(\Ccmath{\Gamma}\)}{\Gcode{t}}{\Ccode{T}}{\Ccode{t}} and some of the
+rules for the constrained synthesis judgment
+\ElabConstrSynth{\(\Ccmath{\Gamma}\)}{\Gcode{t}}{\Ccode{t}}{\bullet}{\Ccode{T}}.
+
+Here is the CHECK elaboration rule for the checking judgment
+\begin{prooftree*}
+\hypo{\text{\ElabSynth{\(\Ccmath{\Gamma}\)}
+    {\(\Gcmath{\tilde{t}}\)}{\Ccode{t}}{\Ccode{T}}}}
+\hypo{\Ccode{T}~\text{\(\Ccmath{\sim}\)}~\Ccode{S}}
+\infer2[CHECK]{\text{\ElabCheck{\(\Ccmath{\Gamma}\)}
+    {\(\Gcmath{\tilde{t}}\)}{\Ccode{S}}{\Cast{\Ccode{S}}{\Ccode{T}}{\Ccode{t}}}}}
+\end{prooftree*}
+Most of the time \Ccode{T}\(\Ccmath{~=_\alpha~}\)\Ccode{S}, i.e. \Ccode{T} and
+\Ccode{S} are \(\alpha\)-equivalent. In this case the elaborated cast in the
+conclusion \Cast{\Ccode{S}}{\Ccode{T}}{\Ccode{t}} would eventually reduce to
+\Ccode{t}. To avoid applying cast reduction rules later during the evaluation
+phase, the implementation directly elaborates \(\Gcmath{\tilde{t}}\) to
+\(\Ccmath{t}\) if \Ccode{T}\(\Ccmath{~=_\alpha~}\)\Ccode{S}. This optimization
+is equivalent to applying the following CHECKEQ rule before applying the CHECK
+rule in the specification:
+\begin{prooftree*}
+\hypo{\text{\ElabSynth{\(\Ccmath{\Gamma}\)}
+    {\(\Gcmath{\tilde{t}}\)}{\Ccode{t}}{\Ccode{T}}}}
+\hypo{\Ccode{T}~\text{\(\Ccmath{=_\alpha}\)}~\Ccode{S}}
+\infer2[CHECKEQ]{\text{\ElabCheck{\(\Ccmath{\Gamma}\)}
+    {\(\Gcmath{\tilde{t}}\)}{\Ccode{S}}{\Ccode{t}}}}
+\end{prooftree*}
+
+The INF-PROD?, INF-UNIV? and INF-IND? elaboration rules for the constrained
+synthesis judgment have the following form
+\begin{prooftree*}
+\hypo{\text{\ElabSynth{\(\Ccmath{\Gamma}\)}
+    {\(\Gcmath{\tilde{t}}\)}{\Ccode{t}}{\Ccode{T}}}}
+\hypo{\Ccode{T}~\text{\(\Ccmath{\leadsto^*}\)}~\Ccode{?}_\Ccode{j}}
+\infer2[INF-*?]{\text{\ElabConstrSynth{\(\Ccmath{\Gamma}\)}
+    {\(\Gcmath{\tilde{t}}\)}
+    {\Cast{\(\Ccmath{\text{germ}_i~}\)\(h\)}{\Ccode{T}}{\Ccode{t}}}
+    {h}
+    {\(\Ccmath{\text{germ}_i~}\)\(h\)}}}
+\end{prooftree*}
+where \(h \in \) Head from Fig. 4 of \citet{lennon-bertrand_gradualizing_2022},
+i.e. \(h\) could be either \(\square_i\), \(\Pi\) or \(I\). The elaborated cast
+in the conclusion uses the type \Ccode{T} which is the result of the synthesis
+in the premise. This cast will reduce \Ccode{T} to \(\Ccode{?}_\Ccode{j}\) later
+during the evaluation phase because the premise says so. To avoid this reduction
+again later, this implementation replaces \Ccode{T} with \(\Ccode{?}_\Ccode{j}\)
+in the elaborated cast. Thus the optimized version of the INF-PROD?, INF-UNIV?
+and INF-IND? elaboration rules has the following form
+\begin{prooftree*}
+\hypo{\text{\ElabSynth{\(\Ccmath{\Gamma}\)}
+    {\(\Gcmath{\tilde{t}}\)}{\Ccode{t}}{\Ccode{T}}}}
+\hypo{\Ccode{T}~\text{\(\Ccmath{\leadsto^*}\)}~\Ccode{?}_\Ccode{j}}
+\infer2[INF-*?]{\text{\ElabConstrSynth{\(\Ccmath{\Gamma}\)}
+    {\(\Gcmath{\tilde{t}}\)}
+    {\Cast{\(\Ccmath{\text{germ}_i~}\)\(h\)}{\(\Ccode{?}_\Ccode{j}\)}{\Ccode{t}}}
+    {h}
+    {\(\Ccmath{\text{germ}_i~}\)\(h\)}}}
+\end{prooftree*}
+
+
+\subsection{Conclusion}
+
+The main conclusion of this implementation exercise is that it is possible to
+implement a GCIC interpreter with minor changes to the rules in
+\citet{lennon-bertrand_gradualizing_2022}. The challenges I faced stemmed not
+from the inherent complexity of combining gradual typing with dependent types,
+but from my limited understanding of the GCIC specification, which addresses
+that complexity, and my lack of familiarity with implementation techniques for
+dependent types. After Meven Lennon-Bertrand, the primary author of
+\citet{lennon-bertrand_gradualizing_2022}, helped me understand the GCIC
+specification, the implementation was straight-forward.
+
+I conjecture that my GCIC implementation follows the specification. Even though
+I don't have a proof to back my claim, I have test programs in
+\texttt{example.rkt} to support it. \texttt{example.rkt} contains examples from
+\citet{lennon-bertrand_gradualizing_2022} along with some examples I came up
+with. The tests in the \texttt{tests} directory make sure that the examples are
+consistent with how \citet{lennon-bertrand_gradualizing_2022} describe them to
+behave.
+
+%Since the authors of GCIC handle the complexity of the combination of gradual
+%typing and dependent types in \cite{lennon-bertrand_gradualizing_2022} through
+%the design decisions for GCIC, I didn't have to deal with handling this
+%complexity in my implementation as long as I followed their specification. The
+%major challenges I faced, however, were due to my lack of understanding of the
+%subtleties in their specification of GCIC and my lack of knowledge about
+%techniques to implement dependent types which the authors didn't cover since it
+%was out of the scope of their paper. Fortunately, the authors of GCIC answered
+%any questions I had about the subtleties of their specification over e-mail.
+%Also, other researchers had already published literature which addressed
+%solutions to any problems I had about implementation techniques which were not
+%addressed in \cite{lennon-bertrand_gradualizing_2022}.
+%
+%The authors helped to clarify the role of the metafunctions Params and Args in
+%enabling universe level polymorphism. They also assured me that the
+%modifications described in Section~\ref{sec:fix-ind-ind} and
+%Section~\ref{sec:elab-optimize} will still satisfy the necessary properties of
+%GCIC. Danvy and Nielsen's work\cite{danvy_refocusing_2004} helped solve the
+%problem of implementing congruence reduction rules in a reasonably efficient
+%manner through refocusing. The GCIC specification mentions full reduction, but
+%doesn't provide enough detail for me to implement it. However, Gr\'egoire and
+%Leroy's work\cite{gregoire_compiled_2002} served as a foundation to implement
+%full reduction for GCIC since they describe how to implement full reduction
+%(strong reduction) for Calculus of Constructions.
+
+\section{Analyzing The Practicality Of The Implementation}\label{sec:question3}
 
 \subsection{The Question}
 Critique the current state of the art with respect to the practical concern of
@@ -495,6 +1120,471 @@ correctness proof for a textbook data-structure of your choice (but more complex
 than a linked-list or vector). Reflect on what went well versus what problems
 were encountered.
 
-\bibliographystyle{acm} \bibliography{ref}
+\subsection{Introduction}
+
+Since GCIC was one of the first gradual dependent type systems, it lacks many
+features which are provided by current proof assistants. There are papers in the
+current literature which address some of these features, but the other features
+--- some of which mentioned as future work in the current literature --- have
+not been explored yet. As a result of my GCIC implementation lacking features
+which I discuss later, I was only able to implement vectors and nothing more
+complicated. However, just by implementing vectors I was able to identify pain
+points which would also trouble us when we implement advanced data structures
+like binary search trees, red-black trees and tensors.
+
+Before moving on to what went wrong with implementing vectors,
+Section~\ref{sec:good-parts} discusses what went well. Every following section
+discusses a different collection of problems.
+Section~\ref{sec:literature-solutions} addresses two problems with this GCIC
+implementation which some papers mentioned in Question~\ref{sec:question1} have
+already explored. The remaining two sections mention problems which have either
+been mentioned in the future work section of papers in
+Question~\ref{sec:question1}, or have been solved for either dependently typed
+or gradually typed programming languages, but not both.
+Section~\ref{sec:ease-of-use} discusses problems which makes development of
+programs and their correctness proofs in my GCIC implementation difficult.
+Finally, Section~\ref{sec:efficiency} covers problems which I need to solve in
+order to make runtime evaluation of GCIC programs in the implementation faster.
+
+\subsection{The Good Parts}\label{sec:good-parts}
+I was glad to realize that the GCIC implementation achieves gradual typing's
+goal of allowing incremental development from untyped programs to fully typed
+programs even in a dependently typed setting. The key advantage of this
+incremental development style is that it allows me to suspend defining a
+function on vectors (e.g., append) at any stage, deferring the proofs about
+vector lengths by inserting the placeholder term \Gcode{?}. Such an incomplete
+function would typecheck while still producing a vector value at runtime but
+with some missing subterms represented by \Gcode{?}. This function can be used
+to write test cases checking the computational result of the function while
+ignoring the proof content which I can fill in later. Agda allows this kind of
+incremental development using holes instead of the unknown term \Gcode{?}. Coq
+doesn't have holes, but the closest it can get to this kind of incremental
+development is by using the \texttt{Admitted} tactic for incomplete proofs.
+Using \texttt{Admitted} is worse because it causes computation of the incomplete
+function on vectors to be stuck on \texttt{Admitted} proof terms even when there
+are no free variables.
+
+Along with leaving the proofs terms incomplete in a function definition, GCIC
+also allowed me to leave the specification of the function incomplete by using
+\Gcode{?} in its type declaration. Consider the following incomplete type
+declaration of the \Gcode{filter}\footnote{Defined as \texttt{fun-filter-f} in
+\texttt{examples.rkt}} function from Example 1 of
+\citet{lennon-bertrand_gradualizing_2022}\footnote{For brevity I will be using
+\(\Gcmath{\mathbb{N}}\) and \(\Gcmath{\mathbb{B}}\) to refer to the types
+\Gcode{Nat()} and \Gcode{Bool()}, respectively mentioned in
+Question~\ref{sec:question2}. Also, I will be assuming that the implementation
+can expand \(\lambda\) and \(\Pi\) terms with multiple parameters into their
+curried forms.}:
+\[
+\Gcmath{\textit{filter} : \Pi\ (A: \square)\ (n: \mathbb{N})\ (f : A \to \mathbb{B}).\
+  \textit{VecF}(A,\ n) \to \textit{VecF}(A,\ ?)}
+\]
+Since the length of the output vector is unspecified, it allows me to skip the
+proofs about vector lengths as well in the definition of \Gcode{filter}. Agda
+doesn't allow leaving the type declaration unspecified using a hole because the
+typechecker complains about an unsolved constraint corresponding to the hole.
+Another aspect in which holes in Agda are lacking is that the Agda compiler
+fails to compile programs with holes to Haskell while programs with \Gcode{?}
+have well-defined runtime semantics which should allow \Gcode{?} to be compiled
+by a compiler in the future. I couldn't figure out a way by which one could have
+an incomplete type declaration in Coq.
+
+\subsection{Problems Which Have Solutions Available In The Literature}
+\label{sec:literature-solutions}
+\paragraph{Indexed Inductive Types}
+This implementation allows us to define inductive types but not indexed
+inductive types. Indexed inductive types allow us to specify more precise
+constraints on our inductive types. For example this is how one would
+define the vector type in a modern proof assistant:
+\begin{lstlisting}[mathescape,language=GCIC]
+data Vec (A: $\square$) : $\mathbb{N}$ $\to$ $\square$ :=
+| nil: Vec(A, zero())
+| cons (_: A) (n: $\mathbb{N}$) (_: Vec(A, n)): Vec(A, (succ(n))).
+\end{lstlisting}
+The current implementation can't express such an inductive definition because
+the index \(\Gcmath{\mathbb{N}}\) in \(\Gcmath{\mathbb{N} \to \square}\) is not
+supported by GCIC. This means that we can't use \(\Gcmath{\mathbb{N}}\)
+constructors in the return type of our vector constructors. Instead I used
+fording to define vectors in our implementation as follows:
+\begin{lstlisting}[mathescape,language=GCIC]
+data VecF (A: $\square$) (n: $\mathbb{N}$) : $\square$ :=
+| nil-f (_: EqNat(zero(), n))
+| cons-f (_: A) (m: $\mathbb{N}$) (_: EqNat(succ(m), n)) (_: VecF(A, m)).
+\end{lstlisting}
+Here, the index constraint on the vector constructor return types are replaced
+by a constructor argument of type \Gcode{EqNat}\footnote{Defined as
+\texttt{ind-def-eq-nat} in \texttt{examples.rkt}} representing a decidable proof
+of equality between natural numbers. Notice how the index
+\(\Gcmath{\mathbb{N}}\) is now the type parameter \(\Gcmath{n: \mathbb{N}}\).
+Also this implementation allows us to skip the return type for the vector
+constructors because without indexed inductive types the return type of both
+vector constructors can only be \Gcode{VecF(A, n)}.
+
+%Indexed inductive types are convenient because defining functions such as
+%\Gcode{head} on vectors become easier. \Gcode{head} takes a \Gcode{Vec(A,
+%  succ(n))} and returns the first element of the input vector. When defining
+%\Gcode{head} in the GCIC implementation using the forded \Gcode{VecF}, I had to
+%do an inductive elimination on the input vector. In the \Gcode{nil-f} case of
+%the elimination, I had to prove a contradiction because the input vector's
+%length is \Gcode{succ(n)} while the length of \Gcode{nil-f} is \Gcode{zero()}
+%which can never be the same. If \Gcode{head} were to be defined using the
+%indexed inductive type \Gcode{Vec}, the elimination form would not have to
+%mention the \Gcode{nil} case because the return type of \Gcode{nil} would help
+%the typechecker infer that this case is redundant. The removal of a single
+%contradiction proof for \Gcode{head} due to an indexed inductive type might seem
+%trivial, but using \Gcode{Vec} instead of \Gcode{VecF} in my implementation of
+%vectors would help me skip a significant number of similar contradiction proofs
+%in other functions on vectors and proofs about vectors.
+
+\citet{malewski_gradual_2024} discuss how to add indexed inductive types to
+\GCICN{} through PUNK. In the future, however, I would like to use GCIC as a
+programming language and not a proof assistant so I would have to focus on
+improving the \GCICG{} variant of the implementation which is suitable for this
+purpose. Even if I add indexed inductive types to \GCICG{} by following PUNK, I
+don't know whether it will lead to weird consequences since PUNK was supposed to
+work with \GCICN{}.
+
+\paragraph{Propositional Equality Type}
+The propositional equality type (denoted by the binary relation \Gcode{=} is
+what proof assistants use to specify equality constraints. Since GCIC doesn't
+have a propositional equality type, the definition of \Gcode{VecF} uses the
+decidable equality type on natural numbers \Gcode{EqNat}. It's called a
+decidable equality because for any natural numbers \Gcode{m} and \Gcode{n},
+\Gcode{EqNat(m, n)} evaluates to the type \Gcode{Unit} if \Gcode{m} and
+\Gcode{n} contain the same number of \Gcode{succ} constructors, otherwise it
+evaluates to the \Gcode{Void} type. Without propositional equality, I will have
+to tediously define a different equality type for every inductive type. Adding
+propositional equality would also allow me to define a substitution operation of
+type \(\Gcmath{\Pi (A: \square) (x\ y: A) (P: A \to \square).\ x \equiv y \to
+  P(x) \to P(y)}\). Because of decidable equality I had to define a different
+substitution operation for different \Gcode{P}. For example, I had to define two
+different substitution operations over \Gcode{EqNat}:
+\[\Gcmath{\textit{subst-vec-f}: \Pi (x\ y: \mathbb{N}) (A: \square).\
+  \textit{EqNat}(x,\ y) \to \textit{VecF}(A,\ x) \to \textit{VecF}(A,\ y)}\]
+\[\Gcmath{\textit{subst-fin-f}: \Pi (x\ y: \mathbb{N}).\
+  \textit{EqNat}(x,\ y) \to \textit{FinF}(x) \to \textit{FinF}(y)}\] Here,
+\Gcode{FinF}\footnote{Defined as \texttt{ind-def-fin-f} in
+\texttt{examples.rkt}} is the forded version of the finite set type \texttt{Fin}
+in Agda or Coq. Notice how \Gcode{P} is instantiated with \(\Gcmath{\lambda n:
+  \mathbb{N}.}\) \Gcode{VecF(A, n)} in \Gcode{subst-vec-f}\footnote{Defined as
+\texttt{proof-subst-vec-f} in \texttt{examples.rkt}} and with \Gcode{FinF} in
+\Gcode{subst-fin-f}\footnote{Defined as \texttt{proof-subst-fin-f} in
+\texttt{examples.rkt}}. I believe that adding propositional equality types to
+the \GCICG{} implementation as described in \citet{eremondi_propositional_2022}
+should be straight forward since GEq extends \GCICG{}.
+
+\subsection{Ease-of-use Problems}\label{sec:ease-of-use}
+\paragraph{Lack Of Control Over Definition Unfolding}
+I tried to emulate global definitions using an implementation-level let-binding
+macro which expands to an application of a \(\lambda\)-abstraction. However,
+this kind of a definition fails to typecheck in some cases. For example, I tried
+to implement the type-level fixpoint version for vectors
+\(\Gcmath{\textit{Vec}_\mu}\)\footnote{Defined as \texttt{fun-vec-}\(\mu\) in
+\texttt{examples.rkt}} as described in section 7.1 of
+\citet{lennon-bertrand_gradualizing_2022}. \(\Gcmath{\textit{Vec}_\mu}\) is a
+function defined by recursion on its second argument such that the term
+\(\Gcmath{\textit{Vec}_\mu\ A\ n}\) evaluates to an \(n\)-ary nested product
+type. The problem with defining \(\Gcmath{\textit{Vec}_\mu}\) as a let-bound
+identifier is that when I want to eliminate a term of type
+\(\Gcmath{\textit{Vec}_\mu\ A\ n}\), I have to use the inductive eliminator for
+the product type. The typechecker then fails to check the eliminator expression
+because it expects the scrutinee type to be a product, but it is unable to
+unfold the definition of \(\Gcmath{\textit{Vec}_\mu}\) in the synthesized type
+of the scrutinee. Here, \(\Gcmath{\textit{Vec}_\mu\ A\ n}\) fails to normalize
+to a product type because \(\Gcmath{\textit{Vec}_\mu}\) is a free variable
+during typechecking. Thus, to satisfy the typechecker, I sparingly use the
+let-binding macro. However, this makes debugging very difficult because then I
+have to look at fully unfolded anonymous lambdas without knowing where they came
+from or what they are computing.
+
+\paragraph{Need For Blame Tracking}
+Another feature that is essential for debugging is blame
+tracking\cite{wadler_well-typed_2009}. In the GCIC implementation, any error
+arising due to a type mismatch during cast reduction just results in an error
+term without any indication as to which location the error originated from. Such
+an error is not helpful for debuggingd. For example, consider the following
+functions along with the incomplete \Gcode{filter} function discussed in
+Section~\ref{sec:good-parts}:
+\[ \Gcmath{\textit{compose} : \Pi\ (A\ B\ C: \square).\
+  (B \to C) \to (A \to B) \to A \to C} \]
+\[ \Gcmath{\textit{head} : \Pi\ (A: \square)\ (n: \mathbb{N}).\
+  \textit{VecF}(A,\ \textit{succ}(n)) \to A} \] \Gcode{compose}\footnote{Defined
+as \texttt{fun-compose} in \texttt{examples.rkt}} composes two functions and
+\Gcode{head}\footnote{Defined as \texttt{fun-head-f} in \texttt{examples.rkt}}
+returns the first element of its input vector. Notice how \Gcode{filter} is the
+only function with a \Gcode{?} in its type. Now consider the following term
+which uses \Gcode{filter}, \Gcode{compose} and \Gcode{head}:
+\[ \Gcmath{\textit{compose}\ (\textit{VecF}(\mathbb{N},\ \underline{3}))\
+                             (\textit{VecF}(\mathbb{N},\ ?))\ \mathbb{N}\
+           (\textit{head}\ \mathbb{N}\ ?)\
+           (\textit{filter}\ \mathbb{N}\ \underline{3}\
+              (\lambda x:\mathbb{N}.\ x < \underline{1}))\
+           \underline{[1;\ 2;\ 3]}} \]
+
+Here, \(\Gcmath{\underline{n}}\) represents the number \(n\) constructed using
+the \(\Gcmath{\mathbb{N}}\) constructors \Gcode{succ} and \Gcode{zero}.
+Similarly, \(\Gcmath{\underline{[1;\ 2;\ 3]}}\) represents the corresponding
+GCIC vector of type \(\Gcmath{\textit{VecF}(\mathbb{N},\ \underline{3})}\). The
+above term applies a composed function returned by \Gcode{compose} to the vector
+\(\Gcmath{\underline{[1;\ 2;\ 3]}}\). The composed function first applies
+\Gcode{filter} and then \Gcode{head} to its argument. The result of evaluating
+the above term after elaboration is the CastCIC error term
+\(\Ccmath{\textit{err}_\mathbb{N}}\). The evaluation results in this error
+because the result of \Gcode{filter} is the empty vector \Gcode{nil-f} of type
+\(\Gcmath{\textit{VecF}(\mathbb{N},\ \textit{zero}())}\) while the input type of
+\(\Gcmath{\textit{head}\ \mathbb{N}\ ?}\) is
+\(\Gcmath{\textit{VecF}(\mathbb{N},\ \textit{succ}(?))}\) and obviously
+\Gcode{zero()} and \Gcode{succ(?)} are not equal. An ideal blame tracking system
+should blame the result of \Gcode{filter} when the evaluator passes it to
+\Gcode{head} as an argument inside the definition of \Gcode{compose}. The blame
+tracking system has to blame \Gcode{filter} because it is the only function
+which has a \Gcode{?} in its type. \citet{wadler_well-typed_2009},
+\citet{siek_blame_2021} and \citet{siek_refined_2015} show how to implement
+blame tracking for a non-dependent gradually typed language and I will need to
+figure out how to apply their blame tracking technique to my GCIC
+implementation.
+
+\paragraph{Need For Agda-like Dependent Pattern Matching}
+My speed of development in the GCIC implementation was slow because I had to
+manage the type dependency between the formal parameters of a dependently typed
+function before eliminating them. This problem worsened as the number of
+dependently typed formal parameters which I had to eliminate increased. For
+example, here is the outline of the proof term for the \Gcode{subst-vec-f}
+function mentioned above in Section~\ref{sec:literature-solutions}:
+\begin{lstlisting}[mathescape,language=GCIC]
+$\lambda$ m: $\mathbb{N}$.
+ ind$_\mathbb{N}$(m, $...$, subst-rec,
+      zero =>
+        $\lambda$ n: $\mathbb{N}$.
+         ind$_\mathbb{N}$(n, $...$, _,
+              zero => $\lambda$ (A: $...$) (p: $...$) (v: $...$). $...$,
+              succ(n$'$) => $\lambda$ (A: $...$) (p: $...$) (v: $...$). $...$),
+      succ(m$'$) =>
+        $\lambda$ n: $\mathbb{N}$.
+         ind$_\mathbb{N}$(n, $...$, _,
+              zero => $\lambda$ (A: $...$) (p: $...$) (v: $...$). $...$,
+              succ(n$'$) => $\lambda$ (A: $...$) (p: $...$) (v: $...$). $...$))
+\end{lstlisting}
+The nesting of lambdas above is necessary because the type annotations of their
+formal parameters (omitted here) need to refer to the elimination pattern
+variables \(\Gcmath{m'}\) and \(\Gcmath{n'}\). With dependent pattern matching I
+would be able to express the above proof term succinctly without any nesting.
+For example, here is the comparatively shorter outline of \Gcode{subst-vec-f}
+defined in Agda which has dependent pattern matching:
+\begin{lstlisting}[mathescape]
+SubstVecF zero zero A p v = $...$
+SubstVecF zero (suc n) A p v = $...$
+SubstVecF (suc m) zero A p v = $...$
+SubstVecF (suc m) (suc n) A p v = $...$
+\end{lstlisting}
+Figuring out how to apply this kind of pattern matching to my GCIC
+implementation would allow one to write much shorter and clear programs.
+
+\paragraph{Need For Implicit Arguments}
+Another way to make our proofs shorter would be to implement implicit arguments
+which allows one to skip the arguments of functions, inductive types and their
+constructors. The type system is then able to infer the skipped arguments
+through unification. I should be able to add implicit arguments to GCIC by
+figuring out how to integrate type inference for non-dependent gradual type
+systems\cite{siek_gradual_2008}\cite{garcia_principal_2015} and implicit
+argument implementation techniques used in Agda and Coq.
+
+\paragraph{Need For Unifying \Gcode{?} And Typed Holes}
+In Section~\ref{sec:good-parts} I mentioned how \Gcode{?} is comparable to holes
+in Agda, and how it is even better in some regards. \Gcode{?} is lacking,
+however, only because it doesn't keep track of the type of variables available
+in its scope. If we somehow associate the types of the variables within scope
+with the type of \Gcode{?} then we should be able to use \Gcode{?} as an aid
+while developing software incrementally just like how we use holes in Agda. This
+would synergize with gradual typing's goal of developing software by
+incrementally adding types.
+
+\subsection{Efficiency Problems}\label{sec:efficiency}
+
+\paragraph{Lack of Space-efficiency}
+Space-efficiency of casts is important for a gradual programming language
+implementation since it ensures a reasonable upper bound on the space occupied
+by casts during the evaluation of a term\cite{herman_space-efficient_2010}.
+Since GCIC evaluates terms during typechecking, space-efficiency is desirable
+for both run-time and compile-time. \citet{lennon-bertrand_gradualizing_2022}
+have not commented on the space-efficiency of GCIC, but I conjecture that GCIC
+is not space-efficient. To make my GCIC implementation space-efficient, I was
+considering following the approach of \citet{siek_blame_2021} by redefining GCIC
+semantics using a (non-space-efficient) coercion calculus and then transforming
+it into a space-efficient coercion calculus.
+
+\paragraph{Call-by-name Evaluation Is Slow}
+Before working on my GCIC implementation, I had come to the wrong conclusion
+that the implementation must use the call-by-name evaluation order because I
+misunderstood the head neutral form rule for function application in Figure~7 of
+\citet{lennon-bertrand_gradualizing_2022}. Call-by-name semantics is inefficient
+because it evaluates a term multiple times rather than evaluating a term once
+and then reusing the term's value multiple times. In order to make my GCIC
+implementation follow the more efficient call-by-value semantics, I would have
+to modify the functions in my implementation which handle refocusing. Still, I
+doubt that the PROD-UNK and PROD-ERR rules from Fig.~5 of
+\citet{lennon-bertrand_gradualizing_2022} will work well with call-by-value
+semantics because they created these rules inspired by \textit{call-by-name
+  exceptions} from \citet{pedrot_failure_2018}.
+
+\paragraph{Presence Of Redundant Terms At Runtime}
+The only use of the decidable equality type \Gcode{EqNat} is to satisfy the
+typechecker regarding the length of the forded vector type \Gcode{VecF}.
+However, at runtime, the functions operating on terms of type \Gcode{VecF} only
+care about the elements of the vector while the \Gcode{VecF} constructor
+arguments of type \Gcode{EqNat} are only used in places not relevant to the
+runtime. For example, the definition of the vector append\footnote{Defined as
+\texttt{fun-vec-f-append} in \texttt{examples.rkt}} function in my GCIC
+implementation only uses the \Gcode{EqNat} arguments of the \Gcode{cons-f} and
+\Gcode{nil-f} constructors to either prove a contradiction indicating that an
+inductive eliminator branch is unreachable at runtime, or as an argument to the
+\Gcode{subst-vec-f} function. The \Gcode{subst-vec-f} function returns a copy of
+its input vector, but with a different type in order to satisfy the typechecker.
+Thus, the vector append function doesn't care about \Gcode{EqNat} terms stored
+in its vector arguments at runtime. Not only do such redundant terms waste space
+in memory at runtime, but, in some cases, they also cause the runtime to waste a
+significant amount of CPU cycles to construct them.
+\citet{tejiscak_erasure_2020} explains this problem in detail while providing
+solutions for them in a non-gradual setting.
+
+%\section{Appendix: Normalization of CastCIC}\label{sec:castcic-normalize}
+%
+%This appendix explains how the normalization phase of my GCIC implementation
+%works.
+%
+%\subsection{Symbolic weak reduction}
+%
+%Symbolic weak reduction reduces CastCIC terms with free variables to a canonical
+%form \(\Ccmath{v}\) defined as follows:
+%\[
+%\begin{aligned}
+% \text{Canon} \ni \Ccmath{v} ::=&\ \Ccmath{\lambda\, x : v.t}\
+%    |\ \Ccmath{c(\overline{v}, \overline{v})}\
+%    |\ \Ccmath{\Pi\, x : v.t}\
+%    |\ \Ccmath{\square_i}\ |\ \Ccode{I}\Ccmath{(\overline{v})}\ |\ \Spine{k}\\
+%    |&\ \Ccmath{?_{V}}\ |\ \Ccmath{\Ccode{err}_{V}}\
+%    |\ \text{\Cast{\(\Ccmath{?_{\square_i}}\)}{\(\Ccmath{\text{germ}_i\ h}\)}{\(\Ccmath{t}\)}}\\
+% \Ccmath{V} ::=&\ \Ccmath{\square_i}\ |\ \Ccode{I}\Ccmath{(\overline{v})}\
+%    |\ \Ccmath{?_{\square_i}}\ |\ \Ccmath{\Ccode{err}_{\square_i}}\\
+% \text{Spine} \ni \Ccmath{k} ::=&\ \Ccmath{x}\ |\ \Spine{k}\,\Ccmath{t}\ |\
+%    |\ \Ccode{ind}_\Ccode{I}\Ccode{(}\Spine{k}\Ccmath{,\, x.t,\, x.\overline{\overline{y}.t}}\Ccode{)}\
+%    |\ \Ccmath{?_{\Spine{k}}}\ |\ \Ccmath{\Ccode{err}_{\Spine{k}}}\\
+%    |&\ \Ccmath{\lambda\, x : \Spine{k}.t}\ |\ \Ccmath{\Pi\, x : \Spine{k}.t}\
+%    |\ \Ccmath{c(\overline{v}, \Spine{k}, \overline{t}, \overline{t})}\
+%    |\ \Ccmath{c(\overline{v}, \overline{v}, \Spine{k}, \overline{t})}\\
+%    |&\ \Ccode{I}\Ccmath{(\overline{v}, \Spine{k}, \overline{t})}\
+%    |\ \text{\Cast{\(\Ccmath{t}\)}{\(\Spine{k}\)}{\(\Ccmath{t}\)}}\
+%    |\ \text{\Cast{\(\Ccmath{t}\)}{\(\Ccmath{?_{\square_i}}\)}{\(\Spine{k}\)}}\
+%    |\ \text{\Cast{\(\Spine{k}\)}{\(\Ccmath{\square_i}\)}{\(\Ccmath{t}\)}}\\
+%    |&\ \text{\Cast{\(\Spine{k}\)}{\(\Ccmath{\Pi\, x : v.t}\)}{\(\Ccmath{t}\)}}\
+%    |\ \text{\Cast{\(\Ccmath{\Pi\, x : v.t}\)}{\(\Ccmath{\Pi\, x : v.t}\)}{\(\Spine{k}\)}}\\
+%    |&\ \text{\Cast{\(\Spine{k}\)}{\(\Ccode{I}\Ccmath{(\overline{v})}\)}{\(\Ccmath{t}\)}}\
+%    |\ \text{\Cast{\(\Ccode{I}\Ccmath{(\overline{v})}\)}{\(\Ccode{I}\Ccmath{(\overline{v})}\)}{\(\Spine{k}\)}}\
+%\end{aligned}
+%\]
+%
+%
+%
+%The function \textit{evaluate} implements symbolic weak reduction using Danvy
+%and Nielsen's \textit{refocus} function\cite{danvy_refocusing_2004}.
+%\textit{evaluate} uses the principal reduction judgment ``\Ccode{t} \(\leadsto\)
+%\Ccode{t}'' and the canonical form judgment ``canonical \Ccode{t}'' from figures
+%5 of \cite{lennon-bertrand_gradualizing_2022}. The \textit{evaluate} function
+%takes a CastCIC term as input and outputs either a weak-head value satisfying
+%the canonical judgment or returns a pair of a stuck term along with its
+%surrounding evaluation context. Let TERM be the type of all CastCIC terms, CANON
+%be the type of all CastCIC terms \Ccode{v} such that canonical \Ccode{v} and
+%EVALCTX be the type of evaluation contexts. The syntax of evaluation contexts is
+%derived from the canonical and neutral form syntax in figure 7 of
+%\cite{lennon-bertrand_gradualizing_2022}.
+%
+%\[
+%\begin{aligned}
+%\textit{evaluate} : \text{Term}_\text{CastCIC} &\to \text{Canon} + (\text{EvalCtx} \times \text{Term}_\text{CastCIC})\\
+%\textit{evaluate}(\Ccode{t}) &= \textit{refocus}(\Ccode{t}, [])
+%\end{aligned}
+%\]
+%
+%The \textit{evaluate} function calls the \textit{refocus} function along with an
+%empty evaluation context. The \textit{refocus} function accepts a term and an
+%evaluation context as input and provides the same type of output as
+%\textit{evaluate}. This implementation defines \textit{refocus} in a mutual
+%recursive manner along with \(\Rfa{}\) and \textit{iterate}. The definitions of
+%\textit{refocus}, \textit{iterate} and \(\Rfa{}\) are inspired from section
+%4.4.2 of \cite{danvy_refocusing_2004}.
+%
+%\[
+%\begin{aligned}
+%  \textit{refocus} : \text{TERM} \times \text{REDCONTEXT} &\to \text{CANON} +
+%    (\text{EVALCTX} \times \text{TERM})\\
+%  \textit{refocus}(\Ccode{v}, \mathcal{E}) &= \Rfa{}(\mathcal{E}, \Ccode{v})
+%    & \text{when canonical \Ccode{v}}\\
+%  \textit{refocus}(\Ccode{x}, \mathcal{E}) &= \textit{iterate}(\mathcal{E}, \Ccode{x})
+%    & \text{when variable \Ccode{x}}\\
+%  \textit{refocus}(\Ccode{t}_\Ccode{1}\ \Ccode{t}_\Ccode{2}, \mathcal{E})
+%    &= \textit{refocus}(\Ccode{t}_\Ccode{1}, \mathcal{E}[[]\ \Ccode{t}_\Ccode{2}])\\
+%  \textit{refocus}(\Ccode{ind}_\Ccode{I}\Ccode{(t, z.P, f.}\overline{\overline{\Ccode{y}}\Ccode{.t}}\Ccode{)}
+%        , \mathcal{E})
+%    &= \textit{refocus}(\Ccode{t},
+%        \mathcal{E}[\Ccode{ind}_\Ccode{I}\Ccode{(} []
+%          \Ccode{, z.P, f.}\overline{\overline{\Ccode{y}}\Ccode{.t}}\Ccode{)}])\\
+%  \textit{refocus}(\Ccode{?}_\Ccode{t}, \mathcal{E})
+%    &= \textit{refocus}(\Ccode{t}, \mathcal{E}[\Ccode{?}_{[]}])\\
+%  \textit{refocus}(\Ccode{err}_\Ccode{t}, \mathcal{E})
+%    &= \textit{refocus}(\Ccode{t}, \mathcal{E}[\Ccode{err}_{[]}])\\
+%  \textit{refocus}(\text{\Cast{\Ccode{t}}{\(\Ccode{t}_\Ccode{1}\)}{\(\Ccode{t}_\Ccode{2}\)}}, \mathcal{E})
+%    &= \textit{refocus}(\Ccode{t}_\Ccode{1}, \mathcal{E}[\text{\Cast{\Ccode{t}}{[]}{\(\Ccode{t}_\Ccode{2}\)}}])
+%\end{aligned}
+%\]
+%
+%\[
+%\begin{aligned}
+%  \textit{iterate} : \text{CANON} + (\text{EVALCTX} \times \text{TERM}) &\to \text{CANON} +
+%    (\text{EVALCTX} \times \text{TERM})\\
+%  \textit{iterate}(\Ccode{v}) &= \Ccode{v}\\
+%  \textit{iterate}(\mathcal{E}, \Ccode{t})
+%        &= \textit{refocus}(\Ccode{t}\Ccmath{'}, \mathcal{E})
+%    &\text{when } \Ccode{t}\rightsquigarrow\Ccode{t}\Ccmath{'}\\
+%\end{aligned}
+%\]
+%
+%\[
+%\begin{aligned}
+%  \Rfa : \text{EVALCTX} \times \text{CANON} &\to \text{CANON} +
+%    (\text{EVALCTX} \times \text{TERM})\\
+%  \Rfa([], \Ccode{v}) &= \textit{iterate}(\Ccode{v})\\
+%  \Rfa(\mathcal{E}[[]\ \Ccode{t}], \Ccode{v}) &= \textit{iterate}(\mathcal{E}, \Ccode{v t}) \\
+%  \Rfa(\mathcal{E}[\Ccode{ind}_\Ccode{I}\Ccode{(} []
+%          \Ccode{, z.P, f.}\overline{\overline{\Ccode{y}}\Ccode{.t}}\Ccode{)}], \Ccode{v})
+%        &= \textit{iterate}(\mathcal{E}, \Ccode{ind}_\Ccode{I}\Ccode{(v, z.P, f.}
+%            \overline{\overline{\Ccode{y}}\Ccode{.t}}\Ccode{)}) \\
+%  \Rfa(\mathcal{E}[\Ccode{?}_{[]}], \Ccmath{\Pi}\Ccode{(x:A).B})
+%        &= \textit{iterate}(\mathcal{E}, \Ccode{?}_{\Ccmath{\Pi}\Ccode{(x:A).B}}) \\
+%  \Rfa(\mathcal{E}[\Ccode{err}_{[]}], \Ccmath{\Pi}\Ccode{(x:A).B})
+%        &= \textit{iterate}(\mathcal{E}, \Ccode{err}_{\Ccmath{\Pi}\Ccode{(x:A).B}}) \\
+%  \Rfa(\mathcal{E}[\Ccode{?}_{[]}], \Ccode{v})
+%        &= \Rfa{}(\mathcal{E}, \Ccode{?}_\Ccode{v}) \\
+%  \Rfa(\mathcal{E}[\Ccode{err}_{[]}], \Ccode{v})
+%        &= \Rfa{}(\mathcal{E}, \Ccode{err}_\Ccode{v}) \\
+%  \Rfa(\mathcal{E}[\text{\Cast{\Ccode{t}}{[]}{\Ccode{t}\(\Ccmath{'}\)}}], \Ccode{?}_{\Ccmath{\square}})
+%        &= \textit{refocus}(\Ccode{t},
+%            \mathcal{E}[\text{\Cast{[]}{\Ccode{?}\(_{\Ccmath{\square}}\)}{\Ccode{t}\(\Ccmath{'}\)}}]) \\
+%  \Rfa(\mathcal{E}[\text{\Cast{\Ccode{t}}{[]}{\Ccode{t}\(\Ccmath{'}\)}}], \Ccode{v})
+%        &= \textit{refocus}(\Ccode{t}\Ccmath{'}, \mathcal{E}[\text{\Cast{\Ccode{t}}{\Ccode{v}}{[]}}])
+%    & \text{when \Ccode{v}} \in
+%        \{\Ccmath{\square},\ \Ccmath{\Pi}\Ccode{(x:A).B},\ \Ccode{I(}\overline{\Ccode{a}}\Ccode{)} \}\\
+%  \Rfa(\mathcal{E}[\text{\Cast{\Ccode{t}}{[]}{\Ccode{t}\(\Ccmath{'}\)}}], \Ccode{v})
+%        &= \textit{iterate}(\mathcal{E}, \text{\Cast{\Ccode{t}}{\Ccode{v}}{\Ccode{t}\(\Ccmath{'}\)}}) \\
+%  \Rfa(\mathcal{E}[\text{\Cast{\Ccode{t}}{\Ccode{t}\(\Ccmath{'}\)}{[]}}], \Ccode{v})
+%        &= \textit{refocus}(\Ccode{t}, \mathcal{E}[\text{\Cast{[]}{\Ccode{t}\(\Ccmath{'}\)}{\Ccode{v}}}])
+%    & \text{when \Ccode{v}} \in
+%        \{\Ccmath{\Pi}\Ccode{(x:A).B},\ \Ccode{I(}\overline{\Ccode{a}}\Ccode{)} \}\\
+%  \Rfa(\mathcal{E}[\text{\Cast{\Ccode{t}}{\Ccode{t}\(\Ccmath{'}\)}{[]}}], \Ccode{v})
+%        &= \textit{iterate}(\mathcal{E}, \text{\Cast{\Ccode{t}}{\Ccode{t}\(\Ccmath{'}\)}{\Ccode{v}}}) \\
+%  \Rfa(\mathcal{E}[\text{\Cast{[]}{\Ccode{t}}{\Ccode{t}\(\Ccmath{'}\)}}], \Ccode{v})
+%        &= \textit{iterate}(\mathcal{E}, \text{\Cast{\Ccode{v}}{\Ccode{t}}{\Ccode{t}\(\Ccmath{'}\)}}) \\
+%\end{aligned}
+%\]
+\bibliographystyle{plainnat} \bibliography{ref}
 
 \end{document}

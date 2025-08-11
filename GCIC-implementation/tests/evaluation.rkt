@@ -4,6 +4,7 @@
 (require "../syntax.rkt")
 (require "../examples.rkt")
 (require "../evaluation.rkt")
+(require (except-in "../elaboration.rkt" check))
 
 (provide ccic-Ω)
 
@@ -80,7 +81,9 @@
           (Lam 'x 'x elab-unk
                (App (Cast (Var 'x) elab-unk (germ (HeadPi) level '()))
                     (Cast (Var 'x) elab-unk (Unk (Univ (cΠ level))))))])
-    (App elab-δ (Cast elab-δ (Pi '_ '_ elab-unk (Unk (Univ (cΠ level)))) elab-unk))))
+    (App elab-δ
+         (Cast elab-δ (Pi '_ '_ elab-unk (Unk (Univ (cΠ level))))
+               (Unk (Univ level))))))
 
 ;; This diverges as expected
 #;
@@ -119,3 +122,27 @@
               (seteqv 'z))
              '())
   (parse-term '(z (□ 0)) '() (seteqv 'z))))
+
+(define defs (elab-defs (parse-defs `(,ind-def-nat))))
+
+(check-true
+ (=α (evaluate (parse-term
+                `((λ (x : (Π (_ : (Nat)) (Nat))) x)
+                  (λ (_ : (Nat))
+                    (< (Nat) <== (? (□ 0)) > (< (? (□ 0)) <== (Nat) > ,(encode-nat 0)))))
+                defs)
+               defs)
+     (parse-term
+      '(λ (_ : (Nat)) (< (Nat) <== (? (□ 0)) > (< (? (□ 0)) <== (Nat) > (@ Nat zero &))))
+      defs)))
+
+(check-true
+ (=α (readback (parse-term
+                '(λ (_ : (Nat))
+                   (< (Nat) <== (? (□ 0)) >
+                      (< (? (□ 0)) <== (Nat) > (@ Nat zero &))))
+                defs)
+               defs)
+      (parse-term
+       '(λ (y : (Nat)) (@ Nat zero &))
+       defs)))

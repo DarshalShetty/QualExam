@@ -488,3 +488,452 @@ In this paper we present a language design, 𝜆★{IFC}, that satisfies both no
 	langid = {english},
 	file = {Danvy and Nielsen - 2004 - Refocusing in Reduction Semantics.pdf:/home/celebrimbor/Zotero/storage/ZFL2KNFU/Danvy and Nielsen - 2004 - Refocusing in Reduction Semantics.pdf:application/pdf},
 }
+
+@inproceedings{gregoire_compiled_2002,
+	location = {Pittsburgh {PA} {USA}},
+	title = {A compiled implementation of strong reduction},
+	isbn = {978-1-58113-487-2},
+	url = {https://dl.acm.org/doi/10.1145/581478.581501},
+	doi = {10.1145/581478.581501},
+	eventtitle = {{ICFP}02: International Conference on Functional Programming},
+	pages = {235--246},
+	booktitle = {Proceedings of the seventh {ACM} {SIGPLAN} international conference on Functional programming},
+	publisher = {{ACM}},
+	author = {Gr\'egoire, Benjamin and Leroy, Xavier},
+	urldate = {2025-05-06},
+	date = {2002-09-17},
+	year = {2002},
+	langid = {english},
+	file = {Full Text:/home/celebrimbor/Zotero/storage/E97YCXYZ/Grégoire and Leroy - 2002 - A compiled implementation of strong reduction.pdf:application/pdf},
+}
+
+@inproceedings{gimenez_structural_1998,
+	location = {Berlin, Heidelberg},
+	title = {Structural recursive definitions in type theory},
+	isbn = {978-3-540-68681-1},
+	abstract = {We introduce an extension of the Calculus of Construction with inductive and co-inductive types that preserves normalisation, while keeping a relatively simple collection of typing rules. This extension considerably enlarges the expressiveness of the language, enabling a direct representation of recursive programs in type theory.},
+	pages = {397--408},
+	booktitle = {Automata, Languages and Programming},
+	publisher = {Springer Berlin Heidelberg},
+	author = {Gim\'enez, Eduardo},
+	editor = {Larsen, Kim G. and Skyum, Sven and Winskel, Glynn},
+	date = {1998},
+	year = {1998},
+}
+
+@phdthesis{lennon-bertrand_bidirectional_2022,
+	title = {Bidirectional Typing for the Calculus of Inductive Constructions},
+	url = {https://www.meven.ac/category/phd-thesis.html},
+	author = {Lennon-Bertrand, Meven},
+	abstract = {Over their more than 50 years of existence, proof assistants have established themselves as tools guaranteeing high trust levels in many applications. Yet, due to their increasing complexity, the historical solution of relying on a small, trusted kernel is not enough anymore to avoid critical bugs while moving forward. But proof assistants have been used for decades to certify program correctness, so why not their own? This is the ambition of the {MetaCoq} project, which aims at providing the first realistic kernel for a proof assistant – Coq – to be formally proven correct, in Coq itself. Don't trust the program anymore, only its proof!
+This thesis studies the bidirectional structure on which the typing algorithm implemented by the kernel of Coq relies, in the context of the Calculus of Inductive Constructions on which it is founded. This is formalized as a part of {MetaCoq}, and is a key step to reach the project’s goal, by giving an intermediate layer between the implementation and its specification. Moreover, the increased control over computation offered by bidirectional typing is a necessary piece in designing a gradual extension of {CIC}, which aims at bringing to development in Coq the flexibility of dynamic typing, and forms the last part of the thesis.},
+	institution = {University of Nantes},
+	school = {University of Nantes},
+	type = {phdthesis},
+	keywords = {Dependent Types, Gradual Typing},
+	year = {2022},
+	file = {22-phd.pdf:/home/celebrimbor/Zotero/storage/K5YYCP49/22-phd.pdf:application/pdf},
+}
+
+@inproceedings{felleisen_control_1987,
+    title = {Control operators, the {SED}-machine, and the \(\lambda\)-calculus},
+    isbn = {978-0-444-70253-1},
+    url = {https://legacy.cs.indiana.edu/ftp/techreports/TR197.pdf},
+    booktitle = {Formal {Description} of {Programming} {Concepts} {III}},
+    publisher = {North-Holland},
+    author = {Felleisen, Matthias and Friedman, D.P.},
+    editor = {Wirsing, Martin},
+    year = {1987},
+}
+
+@article{siek_blame_2021,
+	title = {Blame and coercion: Together again for the first time},
+	volume = {31},
+	issn = {0956-7968, 1469-7653},
+	url = {https://www.cambridge.org/core/product/identifier/S0956796821000101/type/journal_article},
+	doi = {10.1017/S0956796821000101},
+	shorttitle = {Blame and coercion},
+	abstract = {Abstract
+
+              C\#, Dart, Pyret, Racket, {TypeScript}, {VB}: many recent languages integrate dynamic and static types via gradual typing. We systematically develop four calculi for gradual typing and the relations between them, building on and strengthening previous work. The calculi are as follows:
+
+
+
+                  \${\textbackslash}lambda\{B\}\$
+
+
+              , based on the blame calculus of Wadler and Findler (2009);
+
+
+
+                  \${\textbackslash}lambda\{C\}\$
+
+
+              , inspired by the coercion calculus of Henglein (1994);
+
+
+
+                  \${\textbackslash}lambda\{S\}\$
+
+
+              inspired by the space-efficient calculus of Herman, Tomb, and Flanagan (2006); and
+
+
+
+                  \${\textbackslash}lambda\{T\}\$
+
+
+              based on the threesome calculus of Siek and Wadler (2010). While
+
+
+
+                  \${\textbackslash}lambda\{B\}\$
+
+
+              and
+
+
+
+                  \${\textbackslash}lambda\{T\}\$
+
+
+              are little changed from previous work,
+
+
+
+                  \${\textbackslash}lambda\{C\}\$
+
+
+              and
+
+
+
+                  \${\textbackslash}lambda\{S\}\$
+
+
+              are new. Together,
+
+
+
+                  \${\textbackslash}lambda\{B\}\$
+
+
+              ,
+
+
+
+                  \${\textbackslash}lambda\{C\}\$
+
+
+              ,
+
+
+
+                  \${\textbackslash}lambda\{S\}\$
+
+
+              , and
+
+
+
+                  \${\textbackslash}lambda\{T\}\$
+
+
+              provide a coherent foundation for design, implementation, and optimization of gradual types. We define translations from
+
+
+
+                  \${\textbackslash}lambda\{B\}\$
+
+
+              to
+
+
+
+                  \${\textbackslash}lambda\{C\}\$
+
+
+              , from
+
+
+
+                  \${\textbackslash}lambda\{C\}\$
+
+
+              to
+
+
+
+                  \${\textbackslash}lambda\{S\}\$
+
+
+              , and from
+
+
+
+                  \${\textbackslash}lambda\{S\}\$
+
+
+              to
+
+
+
+                  \${\textbackslash}lambda\{T\}\$
+
+
+              . Much previous work lacked proofs of correctness or had weak correctness criteria; here we demonstrate the strongest correctness criterion one could hope for, that each of the translations is fully abstract. Each of the calculi reinforces the design of the others:
+
+
+
+                  \${\textbackslash}lambda\{C\}\$
+
+
+              has a particularly simple definition, and the subtle definition of blame safety for
+
+
+
+                  \${\textbackslash}lambda\{B\}\$
+
+
+              is justified by the simple definition of blame safety for
+
+
+
+                  \${\textbackslash}lambda\{C\}\$
+
+
+              . Our calculus
+
+
+
+                  \${\textbackslash}lambda\{S\}\$
+
+
+              is implementation-ready: the first space-efficient calculus that is both straightforward to implement and easy to understand. We give two applications: first, using full abstraction from
+
+
+
+                  \${\textbackslash}lambda\{C\}\$
+
+
+              to
+
+
+
+                  \${\textbackslash}lambda\{S\}\$
+
+
+              to establish an equational theory of coercions; and second, using full abstraction from
+
+
+
+                  \${\textbackslash}lambda\{B\}\$
+
+
+              to
+
+
+
+                  \${\textbackslash}lambda\{S\}\$
+
+
+              to easily establish the Fundamental Property of Casts, which required a custom bisimulation and six lemmas in earlier work.},
+	pages = {e20},
+	journaltitle = {Journal of Functional Programming},
+	journal = {Journal of Functional Programming},
+	shortjournal = {J. Funct. Prog.},
+	author = {Siek, Jeremy G. and Thiemann, Peter and Wadler, Philip},
+	urldate = {2024-11-06},
+	date = {2021},
+	year = {2021},
+	langid = {english},
+	keywords = {Gradual Typing},
+	file = {Full Text:/home/celebrimbor/Zotero/storage/CWMJIZAI/Siek et al. - 2021 - Blame and coercion Together again for the first t.pdf:application/pdf},
+}
+
+@article{dimoulas_correct_2011,
+	title = {Correct blame for contracts: no more scapegoating},
+	volume = {46},
+	issn = {0362-1340, 1558-1160},
+	url = {https://dl.acm.org/doi/10.1145/1925844.1926410},
+	doi = {10.1145/1925844.1926410},
+	shorttitle = {Correct blame for contracts},
+	abstract = {Behavioral software contracts supplement interface information with logical assertions. A rigorous enforcement of contracts provides useful feedback to developers if it signals contract violations as soon as they occur and if it assigns blame to violators with preciseexplanations. Correct blame assignment gets programmers started with the debugging process and can significantly decrease the time needed to discover and fix bugs.
+            Sadly the literature on contracts lacks a framework for making statements about the correctness of blame assignment and for validating such statements. This paper fills the gap and uses the framework to demonstrate how one of the proposed semantics for higher-order contracts satisfies this criteria and another semantics occasionally assigns blame to the wrong module.
+
+              Concretely, the paper applies the framework to the
+              lax
+              enforcement of dependent higher-order contracts and the
+              picky
+              one. A higher-order dependent contract specifies constraints for the domain and range of higher-order functions and also relates arguments and results in auxiliary assertions. The picky semantics ensures that the use of arguments in the auxiliary assertion satisfies the domain contracts and the lax one does not. While the picky semantics discovers more contract violations than the lax one, it occasionally blames the wrong module. Hence the paper also introduces a third semantics, dubbed
+              indy
+              , which fixes the problems of the picky semantics without giving up its advantages.},
+	pages = {215--226},
+	number = {1},
+	journaltitle = {{ACM} {SIGPLAN} Notices},
+	journal = {{ACM} {SIGPLAN} Notices},
+	shortjournal = {{SIGPLAN} Not.},
+	author = {Dimoulas, Christos and Findler, Robert Bruce and Flanagan, Cormac and Felleisen, Matthias},
+	urldate = {2025-06-16},
+	date = {2011-01-26},
+	year = {2011},
+	langid = {english},
+}
+
+@inproceedings{siek_gradual_2008,
+	location = {Paphos Cyprus},
+	title = {Gradual typing with unification-based inference},
+	isbn = {978-1-60558-270-2},
+	url = {https://dl.acm.org/doi/10.1145/1408681.1408688},
+	doi = {10.1145/1408681.1408688},
+	eventtitle = {{DLS} '08: Dynamic Languages Symposium 2008},
+	pages = {1--12},
+	booktitle = {Proceedings of the 2008 symposium on Dynamic languages},
+	publisher = {{ACM}},
+	author = {Siek, Jeremy G. and Vachharajani, Manish},
+	urldate = {2025-06-16},
+	date = {2008-07-08},
+	year = {2008},
+	langid = {english},
+}
+
+@incollection{wadler_well-typed_2009,
+	location = {Berlin, Heidelberg},
+	title = {Well-Typed Programs Can’t Be Blamed},
+	volume = {5502},
+	rights = {http://www.springer.com/tdm},
+	isbn = {978-3-642-00589-3 978-3-642-00590-9},
+	url = {http://link.springer.com/10.1007/978-3-642-00590-9_1},
+	pages = {1--16},
+	booktitle = {Programming Languages and Systems},
+	publisher = {Springer Berlin Heidelberg},
+	author = {Wadler, Philip and Findler, Robert Bruce},
+	editor = {Castagna, Giuseppe},
+	urldate = {2025-08-05},
+	date = {2009},
+	year = {2009},
+	doi = {10.1007/978-3-642-00590-9_1},
+	note = {Series Title: Lecture Notes in Computer Science},
+	file = {Full Text:/home/celebrimbor/Zotero/storage/AA5JM8W2/Wadler and Findler - 2009 - Well-Typed Programs Can’t Be Blamed.pdf:application/pdf},
+}
+
+@incollection{brady_inductive_2004,
+	location = {Berlin, Heidelberg},
+	title = {Inductive Families Need Not Store Their Indices},
+	volume = {3085},
+	isbn = {978-3-540-22164-7 978-3-540-24849-1},
+	url = {http://link.springer.com/10.1007/978-3-540-24849-1_8},
+	pages = {115--129},
+	booktitle = {Types for Proofs and Programs},
+	publisher = {Springer Berlin Heidelberg},
+	author = {Brady, Edwin and {McBride}, Conor and {McKinna}, James},
+	editor = {Berardi, Stefano and Coppo, Mario and Damiani, Ferruccio},
+	editorb = {Kanade, Takeo and Kittler, Josef and Kleinberg, Jon M. and Mattern, Friedemann and Mitchell, John C. and Naor, Moni and Nierstrasz, Oscar and Pandu Rangan, C. and Steffen, Bernhard and Sudan, Madhu and Terzopoulos, Demetri and Tygar, Dough and Vardi, Moshe Y. and Weikum, Gerhard},
+	editorbtype = {redactor},
+	urldate = {2025-08-05},
+	date = {2004},
+	year = {2004},
+	doi = {10.1007/978-3-540-24849-1_8},
+	note = {Series Title: Lecture Notes in Computer Science},
+}
+
+@article{abel_decidability_2018,
+	title = {Decidability of conversion for type theory in type theory},
+	volume = {2},
+	issn = {2475-1421},
+	url = {https://dl.acm.org/doi/10.1145/3158111},
+	doi = {10.1145/3158111},
+	abstract = {Type theory should be able to handle its own meta-theory, both to justify its foundational claims and to obtain a verified implementation. At the core of a type checker for intensional type theory lies an algorithm to check equality of types, or in other words, to check whether two types are convertible. We have formalized in Agda a practical conversion checking algorithm for a dependent type theory with one universe à la Russell, natural numbers, and η-equality for Π types. We prove the algorithm correct via a Kripke logical relation parameterized by a suitable notion of equivalence of terms. We then instantiate the parameterized fundamental lemma twice: once to obtain canonicity and injectivity of type formers, and once again to prove the completeness of the algorithm. Our proof relies on inductive-recursive definitions, but not on the uniqueness of identity proofs. Thus, it is valid in variants of intensional Martin-Löf Type Theory as long as they support induction-recursion, for instance, Extensional, Observational, or Homotopy Type Theory.},
+	pages = {1--29},
+	issue = {{POPL}},
+	journaltitle = {Proceedings of the {ACM} on Programming Languages},
+	journal = {Proceedings of the {ACM} on Programming Languages},
+	shortjournal = {Proc. {ACM} Program. Lang.},
+	author = {Abel, Andreas and Öhman, Joakim and Vezzosi, Andrea},
+	urldate = {2025-08-05},
+	date = {2018-01},
+	year = {2018},
+	langid = {english},
+	file = {Full Text:/home/celebrimbor/Zotero/storage/XQLINB3H/Abel et al. - 2018 - Decidability of conversion for type theory in type.pdf:application/pdf},
+}
+
+@article{sozeau_coq_2020,
+	title = {Coq Coq correct! verification of type checking and erasure for Coq, in Coq},
+	volume = {4},
+	issn = {2475-1421},
+	url = {https://dl.acm.org/doi/10.1145/3371076},
+	doi = {10.1145/3371076},
+	abstract = {Coq is built around a well-delimited kernel that perfoms typechecking for definitions in a variant of the Calculus of Inductive Constructions ({CIC}). Although the metatheory of {CIC} is very stable and reliable, the correctness of its implementation in Coq is less clear. Indeed, implementing an efficient type checker for {CIC} is a rather complex task, and many parts of the code rely on implicit invariants which can easily be broken by further evolution of the code. Therefore, on average, one critical bug has been found every year in Coq.
+            This paper presents the first implementation of a type checker for the kernel of Coq (without the module system and template polymorphism), which is proven correct in Coq with respect to its formal specification and axiomatisation of part of its metatheory. Note that because of Gödel's incompleteness theorem, there is no hope to prove completely the correctness of the specification of Coq inside Coq (in particular strong normalisation or canonicity), but it is possible to prove the correctness of the implementation assuming the correctness of the specification, thus moving from a trusted code base ({TCB}) to a trusted theory base ({TTB}) paradigm.
+            Our work is based on the {MetaCoq} project which provides metaprogramming facilities to work with terms and declarations at the level of this kernel. Our type checker is based on the specification of the typing relation of the Polymorphic, Cumulative Calculus of Inductive Constructions ({PCUIC}) at the basis of Coq and the verification of a relatively efficient and sound type-checker for it. In addition to the kernel implementation, an essential feature of Coq is the so-called extraction: the production of executable code in functional languages from Coq definitions. We present a verified version of this subtle type-and-proof erasure step, therefore enabling the verified extraction of a safe type-checker for Coq.},
+	pages = {1--28},
+	issue = {{POPL}},
+	journaltitle = {Proceedings of the {ACM} on Programming Languages},
+	shortjournal = {Proc. {ACM} Program. Lang.},
+	author = {Sozeau, Matthieu and Boulier, Simon and Forster, Yannick and Tabareau, Nicolas and Winterhalter, Théo},
+	urldate = {2025-08-05},
+	date = {2020-01},
+	year = {2020},
+	langid = {english},
+	file = {Full Text:/home/celebrimbor/Zotero/storage/99A2FDJM/Sozeau et al. - 2020 - Coq Coq correct! verification of type checking and.pdf:application/pdf},
+}
+
+@article{garcia_principal_2015,
+	title = {Principal Type Schemes for Gradual Programs},
+	volume = {50},
+	issn = {0362-1340, 1558-1160},
+	url = {https://dl.acm.org/doi/10.1145/2775051.2676992},
+	doi = {10.1145/2775051.2676992},
+	abstract = {Gradual typing is a discipline for integrating dynamic checking into a static type system. Since its introduction in functional languages, it has been adapted to a variety of type systems, including object-oriented, security, and substructural. This work studies its application to implicitly typed languages based on type inference. Siek and Vachharajani designed a gradual type inference system and algorithm that infers gradual types but still rejects ill-typed static programs. However, the type system requires local reasoning about type substitutions, an imperative inference algorithm, and a subtle correctness statement.
+            This paper introduces a new approach to gradual type inference, driven by the principle that gradual inference should only produce static types. We present a static implicitly typed language, its gradual counterpart, and a type inference procedure. The gradual system types the same programs as Siek and Vachharajani, but has a modular structure amenable to extension. The language admits let-polymorphism, and its dynamics are defined by translation to the Polymorphic Blame Calculus.
+            The principal types produced by our initial type system mask the distinction between static parametric polymorphism and polymorphism that can be attributed to gradual typing. To expose this difference, we distinguish static type parameters from gradual type parameters and reinterpret gradual type consistency accordingly. The resulting extension enables programs to be interpreted using either the polymorphic or monomorphic Blame Calculi.},
+	pages = {303--315},
+	number = {1},
+	journaltitle = {{ACM} {SIGPLAN} Notices},
+	journal = {{ACM} {SIGPLAN} Notices},
+	shortjournal = {{SIGPLAN} Not.},
+	author = {Garcia, Ronald and Cimini, Matteo},
+	urldate = {2025-08-09},
+	date = {2015-05-11},
+	year = {2015},
+	langid = {english},
+	file = {Submitted Version:/home/celebrimbor/Zotero/storage/RLYCHPG9/Garcia and Cimini - 2015 - Principal Type Schemes for Gradual Programs.pdf:application/pdf},
+}
+
+@article{herman_space-efficient_2010,
+	title = {Space-efficient gradual typing},
+	volume = {23},
+	rights = {http://www.springer.com/tdm},
+	issn = {1388-3690, 1573-0557},
+	url = {http://link.springer.com/10.1007/s10990-011-9066-z},
+	doi = {10.1007/s10990-011-9066-z},
+	pages = {167--189},
+	number = {2},
+	journaltitle = {Higher-Order and Symbolic Computation},
+	journal = {Higher-Order and Symbolic Computation},
+	shortjournal = {Higher-Order Symb Comput},
+	author = {Herman, David and Tomb, Aaron and Flanagan, Cormac},
+	urldate = {2024-11-15},
+	date = {2010-06},
+	year = {2010},
+	langid = {english},
+	keywords = {Gradual Typing},
+	file = {Full Text:/home/celebrimbor/Zotero/storage/88TMD9CF/Herman et al. - 2010 - Space-efficient gradual typing.pdf:application/pdf},
+}
+
+@phdthesis{tejiscak_erasure_2020,
+	title = {Erasure in dependently typed programming},
+	doi = {10.17630/STA/677},
+	abstract = {It is important to reduce the cost of correctness in programming. Dependent types and related techniques, such as type-driven programming, oﬀer ways to do so. Some parts of dependently typed programs constitute evidence of their typecorrectness and, once checked, are unnecessary for execution. These parts can easily become asymptotically larger than the remaining runtime-useful computation, which can cause linear-time algorithms run in exponential time, or worse. It would be unnacceptable, and contradict our goal of reducing the cost of correctness, to make programs run slower by only describing them more precisely. Current systems cannot erase such computation satisfactorily. By modelling erasure indirectly through type universes or irrelevance, they impose the limitations of these means to erasure. Some useless computation then cannot be erased and idiomatic programs remain asymptotically sub-optimal. This dissertation explains why we need erasure, that it is diﬀerent from other concepts like irrelevance, and proposes two ways of erasing non-computational data. One is an untyped ﬂow-based useless variable elimination, adapted for dependently typed languages, currently implemented in the Idris 1 compiler. The other is the main contribution of the dissertation: a dependently typed core calculus with erasure annotations, full dependent pattern matching, and an algorithm that infers erasure annotations from unannotated (or partially annotated) programs. I show that erasure in well-typed programs is sound in that it commutes with single-step reduction. Assuming the Church-Rosser property of reduction, I show that properties such as Subject Reduction hold, which extends the soundness result to multi-step reduction. I also show that the presented erasure inference is sound and complete with respect to the typing rules; that this approach can be extended with various forms of erasure polymorphism; that it works well with monadic I/O and foreign functions; and that it is eﬀective in that it not only removes the runtime overhead caused by dependent typing in the presented examples, but can also shorten compilation times.},
+	author = {Tejiščák, Matúš},
+	editora = {Brady, Edwin},
+	editoratype = {collaborator},
+	urldate = {2025-05-06},
+	date = {2020-07-07},
+	year = {2020},
+	langid = {english},
+	note = {Publisher: University of St Andrews},
+	school = {University of St Andrews},
+	keywords = {Dependent Types, Computer software--Verification, Functional programming (Computer science), Idris (Computer program language), {QA}76.62T4},
+	file = {Tejiščák - 2020 - Erasure in dependently typed programming.pdf:/home/celebrimbor/Zotero/storage/J2IM9BR4/Tejiščák - 2020 - Erasure in dependently typed programming.pdf:application/pdf},
+}

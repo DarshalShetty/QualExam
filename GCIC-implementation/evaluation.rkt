@@ -525,7 +525,8 @@
                (FConstrParam ind-name constr-name level
                              (cons v rev-pre-params)
                              later-params args)
-               evalctx))]
+               evalctx)
+              defs)]
     [((cons
        (FConstrParam ind-name constr-name level rev-params '()
                      (cons first-arg rest-args))
@@ -537,7 +538,8 @@
                (FConstrArg ind-name constr-name level
                            (reverse (cons v rev-params))
                            '() rest-args)
-               evalctx))]
+               evalctx)
+              defs)]
     [((cons
        (FConstrParam ind-name constr-name level rev-params '() '())
        evalctx)
@@ -557,7 +559,8 @@
               (cons
                (FConstrArg ind-name constr-name level params
                            (cons v rev-pre-args) later-args)
-               evalctx))]
+               evalctx)
+              defs)]
     [((cons
        (FConstrArg ind-name constr-name level params rev-args '())
        evalctx)
@@ -577,7 +580,8 @@
                (FIndT name level
                       (cons v rev-pre-args)
                       later-args)
-               evalctx))]
+               evalctx)
+              defs)]
     [((cons (FIndT name level rev-args '()) evalctx) _)
      ;; case 3
      (refocus-aux evalctx
@@ -634,18 +638,22 @@
      (define y (gensym x-orig))
      #;
      (Lam y x-orig canon-T
-          (normalize (App (Lam x x-orig canon-T body) (Spine (Var y))) defs))
+          (normalize (App (Lam x x-orig (readback canon-T defs) body) (Spine (Var y))) defs))
      ;; TODO: test if this unsafe optimization is equivalent to the proper way
      ;; to do it as commented above. The same optimization is done in the Pi
      ;; case and the IndElim case in the unwind function. Once a counterexample
      ;; is found, need to implement the proper way.
-     (Lam x x-orig canon-T (normalize body defs))]
+     (Lam x x-orig
+          (readback canon-T defs)
+          (normalize body defs))]
     [(Pi x x-orig canon-T body)
      (define y (gensym x-orig))
      #;
      (Pi y x-orig canon-T
-         (normalize (App (Pi x x-orig canon-T body) (Spine (Var y))) defs))
-     (Pi x x-orig canon-T (normalize body defs))]
+         (normalize (App (Pi x x-orig (readback canon-T defs) body) (Spine (Var y))) defs))
+     (Pi x x-orig
+         (readback canon-T defs)
+         (normalize body defs))]
     [(Constr ind-name constr-name level canon-params canon-args)
      (Constr ind-name constr-name level
              (for/list ([param canon-params])
@@ -772,7 +780,6 @@
           canon-t1
           canon-t2))
 
-#|
-(require racket/trace)
-(trace refocus refocus-aux iterate)
-|#
+#;(require racket/trace)
+#;(trace normalize readback)
+#;(trace refocus refocus-aux iterate)

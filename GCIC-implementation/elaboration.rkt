@@ -18,7 +18,7 @@
 (require (only-in "evaluation.rkt"
                   current-variant
                   HeadPi HeadUniv HeadIndT
-                  sΠ cΠ germ evaluate ~))
+                  sΠ cΠ germ normalize ~))
 
 
 (define (context? Γ defs)
@@ -106,7 +106,7 @@
          (define Γ-branch
            (for/fold ([Γ^ Γ-branches])
                      ([y ys]
-                      [y-typeᶜ  (subst-args defs I i-s cₖ asᶜ ys-var)])
+                      [y-typeᶜ (subst-args defs I i-s cₖ asᶜ ys-var)])
              (dict-set Γ^ y y-typeᶜ )))
          (define tₖ-typeᶜ
            (subst `(,(Constr I cₖ i-s asᶜ ys-var))
@@ -249,20 +249,18 @@
   (trace-elab "~a Synthesizing type with head ~a for term: ~a"
               (make-string indent #\>) hd (unparse-term tᵍ (list->seteqv (map car Γ))))
   (define-values (tᶜ Tᶜ) (synth Γ tᵍ defs (add1 indent)))
-  (define canon-Tᶜ (evaluate Tᶜ defs))
-  ;; TODO: Figure out whether it is okay to use canon-Tᶜ instead of Tᶜ as
-  ;; the source type of the cast being returned in the *? rules.
+  (define norm-Tᶜ (normalize Tᶜ defs))
   (define T^
     (cond
-      [(unsafe-optimize?) canon-Tᶜ]
+      [(unsafe-optimize?) norm-Tᶜ]
       [else Tᶜ]))
   ;; TODO: refactor to use fewer matches
   (match hd
     [(HeadPi)
-     (match canon-Tᶜ
+     (match norm-Tᶜ
        [(Pi _ _ _ _)
         (trace-elab "~a Applying constrained synthesis rule: INF-PROD" (make-string indent #\>))
-        (values tᶜ canon-Tᶜ)]
+        (values tᶜ norm-Tᶜ)]
        [(Unk (Univ i))
         #:when (natural? (cΠ i))
         (trace-elab "~a Applying constrained synthesis rule: INF-PROD?"
@@ -273,13 +271,13 @@
                  (string-append "Expected a type with head ~a or the type (? (□ i))"
                                 " where (cΠ i) >= 0, but got ~a while constrained "
                                 "synthesis of term ~a")
-                 hd canon-Tᶜ tᵍ)])]
+                 hd norm-Tᶜ tᵍ)])]
     [(HeadUniv _)
-     (match canon-Tᶜ
+     (match norm-Tᶜ
        [(Univ i)
         (trace-elab "~a Applying constrained synthesis rule: INF-UNIV"
                     (make-string indent #\>))
-        (values tᶜ canon-Tᶜ)]
+        (values tᶜ norm-Tᶜ)]
        [(Unk (Univ j))
         #:when (> j 0)
         (trace-elab "~a Applying constrained synthesis rule: INF-UNIV?"
@@ -290,14 +288,14 @@
                  (string-append "Expected a type with head ~a or the type (? (□ i))"
                                 " where i > 0, but got ~a while constrained "
                                 "synthesis of term ~a")
-                 hd canon-Tᶜ tᵍ)])]
+                 hd norm-Tᶜ tᵍ)])]
     [(HeadIndT I)
-     (match canon-Tᶜ
+     (match norm-Tᶜ
        [(IndT I^ _ _)
         #:when (eqv? I I^)
         (trace-elab "~a Applying constrained synthesis rule: INF-IND"
                     (make-string indent #\>))
-        (values tᶜ canon-Tᶜ)]
+        (values tᶜ norm-Tᶜ)]
        [(Unk (Univ i))
         (trace-elab "~a Applying constrained synthesis rule: INF-IND?"
                     (make-string indent #\>))
@@ -306,7 +304,7 @@
        [_ (error 'constrain-synth
                  (string-append "Expected a type with head ~a or the type (? (□ i))"
                                 ", but got ~a while constrained synthesis of term ~a")
-                 hd canon-Tᶜ tᵍ)])]
+                 hd norm-Tᶜ tᵍ)])]
     [_ (error 'synth "Expected a head type, but found ~a" hd)]))
 
 ; precondition: (and (context? Γ)

@@ -144,7 +144,7 @@
               (string-append
                "~a branches in inductive elimination doesn't match with the "
                "number of constructors in definition of inductive type '~a'")
-              ind-name))
+              (length branches) ind-name))
      (IndElim ind-name (recurse scrut) z z
               (parse-term P defs (set-add scope z)) f f
               (parse-elim-branches branches ind-name defs (set-add scope f)))]
@@ -765,7 +765,7 @@
           (subst-binder terms for-symbols z orig-z P))
         (define-values (f^ branches^)
           (cond
-            [(memv f for-symbols) (values f branches)]
+            [(null? (remv f for-symbols)) (values f branches)]
             [else
              (define fresh-f (fresh-name orig-f))
              (values
@@ -786,6 +786,9 @@
        [(Spine neut)
         (Spine (recurse neut))])]))
 
+;(require racket/trace)
+;(trace subst)
+
 (define (subst-elim-branches terms for-symbols in-branches)
   (for/list ([b in-branches])
     (match-define (Branch constr-name arg-names orig-arg-names body) b)
@@ -798,6 +801,10 @@
        (define body^
          (subst terms for-symbols
                 (subst (map Var fresh-arg-names) arg-names body)))
+       (debug-log (format "###In subst-elim-branches."))
+       (debug-log (format "###arg-names=~a~n" arg-names))
+       (debug-log (format "###fresh-arg-names=~a~n" fresh-arg-names))
+       (debug-log (format "###body^=~a~n" (unparse-term body^ (seteqv) #f)))
        (Branch constr-name fresh-arg-names orig-arg-names body^)])))
 
 (define (subst-binder terms for-symbols bind-name orig-bind-name in-term)

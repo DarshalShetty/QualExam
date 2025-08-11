@@ -19,6 +19,8 @@
 
 (check-program prog-nat-one)
 
+(check-program prog-norm-in-elab)
+
 (check-equal? (Program-term
                (parse prog-list-nat-one))
               (Constr 'List 'cons 0
@@ -31,7 +33,15 @@
 
 (check-program prog-list-nat-one)
 
+(check-program prog-list-univ-err)
+
+(check-program prog-list-univ)
+
+(check-program prog-list-univ-weird)
+
 (check-program prog-list-append-12-34)
+
+(check-program prog-list-length-123)
 
 (check-program prog-omega)
 
@@ -39,9 +49,35 @@
 
 (check-program prog-add-2-3)
 
+(check-program prog-leb-2-3)
+
 (check-program prog-eq-nat-2)
 
+(check-program prog-one-zero?)
+
+(check-program prog-one-zero?-unk)
+
+(check-program prog-inj-eq-nat)
+
+(check-program prog-proj-eq-nat)
+
+(check-program prog-false-O-S)
+
+(check-program prog-sym-eq-nat)
+
+(check-program prog-trans-eq-nat)
+
 (check-program prog-vec-f-12)
+
+(check-program prog-head-f)
+
+(check-program prog-vec-f-filter-leb4-35)
+
+(check-program prog-example-1)
+
+(check-program prog-example-1-err)
+
+(check-program prog-compose-≤3-length-123)
 
 (check-program prog-vec-f-append-12-34)
 
@@ -49,6 +85,19 @@
 
 (check-program prog-check-arg)
 
+(check-program prog-blame)
+
+(check-program prog-fin-3)
+
+(check-program prog-fin-3-typefail)
+
+(check-program prog-false-fin-O)
+
+(check-program prog-subst-fin-f)
+
+(check-program prog-nth-1-34)
+
+(check-program prog-nth-3-1234)
 
 (define term-subst-test
   (Lam 'f 'f

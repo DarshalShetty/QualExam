@@ -3,14 +3,13 @@ module Tensors where
 open import Data.List using (List; []; _∷_; length; product; _++_)
 open import Data.Vec using (Vec) renaming ([] to <>; _∷_ to _∺_; map to vmap)
 open import Data.Float using (Float; _+_)
-open import Data.Nat using (ℕ; suc; zero)
+open import Data.Nat using (ℕ; suc; zero; _<ᵇ_)
 import Relation.Binary.PropositionalEquality as Eq
 open Eq using (_≡_; refl; cong)
 open import Relation.Nullary.Negation using (¬_)
 open import Data.Product.Base using (∃-syntax; proj₁; proj₂) renaming (_,_ to ⟨_,_⟩)
 open import Data.Unit using (⊤; tt)
 open import Data.Empty using (⊥)
-
 
 data Tensor : List ℕ -> Set where
   scalar : Float -> Tensor []
@@ -79,4 +78,5 @@ build-tensor = {!!}
 
 reshape : {s : List ℕ} -> Tensor s -> (r : List ℕ) -> product s ≡ product r -> Tensor r
 reshape t r H = {!!}
+
 
